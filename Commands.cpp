@@ -90,6 +90,41 @@ SmallShell::~SmallShell() {
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
+
+    string cmd_s = _trim(string(cmd_line));
+    string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+
+    if (firstWord.compare("pwd") == 0){
+        return new GetCurrDirCommand(cmd_line);
+    }
+    else if (firstWord.compare("showpid") == 0){
+        return new ShowPidCommand(cmd_line);
+    }
+    else if (firstWord.compare("chprompt")==0){
+        return new ChangePromptCommand(cmd_line);
+    }
+/*
+    else if (firstWord.compare("cd")==0){
+        return new ChangeDirCommand(cmd_line, cmd_s); // TODO fix
+    }
+    else if (firstWord.compare("jobs")==0){
+        return new JobsList(cmd_line); // external
+    }
+    else if (firstWord.compare("kill")==0){
+        return new KillCommand(cmd_line); // external
+    }
+    else if (firstWord.compare("fg")==0){
+        return new ForegroundCommand(cmd_line); // external
+    }
+    else if (firstWord.compare("bg")==0){
+        return new BackgroundCommand(cmd_line); // external
+    }
+    else if (firstWord.compare("quit")==0){
+        return new QuitCommand(cmd_line); // external
+    }
+     */
+
+    /*
 	// For example:
 
   string cmd_s = _trim(string(cmd_line));
@@ -106,14 +141,33 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   else {
     return new ExternalCommand(cmd_line);
   }
-
+*/
   return nullptr;
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
+    Command *cmd = CreateCommand(cmd_line);
+    //if (cmd_line[0]=="") { // TODO handle forking external commands
+        cmd->execute();
+    //}
+
   // TODO: Add your implementation here
   // for example:
   // Command* cmd = CreateCommand(cmd_line);
   // cmd->execute();
   // Please note that you must fork smash process for some commands (e.g., external commands....)
+}
+
+
+
+//==================================== Commands ======================================//
+
+void ShowPidCommand::execute() {
+    cout << "smash pid is " + getpid() << "\n";
+}
+
+void GetCurrDirCommand::execute() {
+    char * buf;
+    get_current_dir_name();
+    cout << getcwd(buf, 32); // TODO what's wrong?
 }

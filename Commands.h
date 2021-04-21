@@ -2,12 +2,12 @@
 #define SMASH_COMMAND_H_
 #include <vector>
 
-#define define DO_SYS( syscall ) do { \
-                                    if((syscall) == -1 ) { \
-                                    perror( #syscall ); \
-                                    exit(1); \
-                                    } \
-                                } while( 0 ) \
+#define DO_SYS( syscall ) do { \
+    if((syscall) == -1 ) { \
+    perror( #syscall ); \
+    exit(1); \
+    } \
+    } while( 0 ) \
 
 int _parseCommandLine(const char* cmd_line, char** args);
 // TODO: add define DO_SYS
@@ -57,7 +57,14 @@ class RedirectionCommand : public Command {
   //void cleanup() override;
 };
 
-// TODO: add chprmpt
+// TODO: add chprompt
+class ChangePromptCommand : public BuiltInCommand {
+// TODO: Add your data members public:
+public:
+    ChangePromptCommand(const char* cmd_line); // TODO more arguments maybe
+    virtual ~ChangePromptCommand() {}
+    void execute() override;
+};
 
 // TODO cd
 class ChangeDirCommand : public BuiltInCommand {
@@ -112,7 +119,7 @@ class JobsList {
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob(int *jobId);
-  // TODO: Add extra methods or modify exisitng ones as needed
+  // TODO: Add extra methods or modify existing ones as needed
 };
 
 class JobsCommand : public BuiltInCommand {
