@@ -79,6 +79,7 @@ void _removeBackgroundSign(char* cmd_line) {
 
 SmallShell::SmallShell() {
 // TODO: add your implementation
+// TODO init prompt
 }
 
 SmallShell::~SmallShell() {
@@ -90,7 +91,7 @@ SmallShell::~SmallShell() {
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
-/*
+
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
@@ -105,7 +106,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   else {
     return new ExternalCommand(cmd_line);
   }
-  */
+
   return nullptr;
 }
 

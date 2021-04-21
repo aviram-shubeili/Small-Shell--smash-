@@ -1,8 +1,16 @@
 #ifndef SMASH_COMMAND_H_
 #define SMASH_COMMAND_H_
-
 #include <vector>
 
+#define define DO_SYS( syscall ) do { \
+                                    if((syscall) == -1 ) { \
+                                    perror( #syscall ); \
+                                    exit(1); \
+                                    } \
+                                } while( 0 ) \
+
+int _parseCommandLine(const char* cmd_line, char** args);
+// TODO: add define DO_SYS
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -49,6 +57,9 @@ class RedirectionCommand : public Command {
   //void cleanup() override;
 };
 
+// TODO: add chprmpt
+
+// TODO cd
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
   ChangeDirCommand(const char* cmd_line, char** plastPwd);
@@ -56,6 +67,7 @@ class ChangeDirCommand : public BuiltInCommand {
   void execute() override;
 };
 
+// TODO pwd
 class GetCurrDirCommand : public BuiltInCommand {
  public:
   GetCurrDirCommand(const char* cmd_line);
@@ -63,12 +75,14 @@ class GetCurrDirCommand : public BuiltInCommand {
   void execute() override;
 };
 
+// TODO showpid
 class ShowPidCommand : public BuiltInCommand {
  public:
   ShowPidCommand(const char* cmd_line);
   virtual ~ShowPidCommand() {}
   void execute() override;
 };
+
 
 class JobsList;
 class QuitCommand : public BuiltInCommand {
@@ -143,7 +157,7 @@ class CatCommand : public BuiltInCommand {
 
 class SmallShell {
  private:
-  // TODO: Add your data members
+  std::string prompt;
   SmallShell();
  public:
   Command *CreateCommand(const char* cmd_line);
