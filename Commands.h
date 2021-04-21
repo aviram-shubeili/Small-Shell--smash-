@@ -18,8 +18,8 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 class Command {
 // TODO: Add your data members
  public:
-  Command(const char* cmd_line);
-  virtual ~Command();
+  Command(const char* cmd_line= "") {}
+  virtual ~Command() = default;
   virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
@@ -28,7 +28,7 @@ class Command {
 
 class BuiltInCommand : public Command {
  public:
-  BuiltInCommand(const char* cmd_line);
+  BuiltInCommand(const char* cmd_line= "") {}
   virtual ~BuiltInCommand() {}
 };
 
@@ -77,7 +77,7 @@ class ChangeDirCommand : public BuiltInCommand {
 // TODO pwd
 class GetCurrDirCommand : public BuiltInCommand {
  public:
-  GetCurrDirCommand(const char* cmd_line);
+  GetCurrDirCommand(const char* cmd_line );
   virtual ~GetCurrDirCommand() {}
   void execute() override;
 };
@@ -85,7 +85,7 @@ class GetCurrDirCommand : public BuiltInCommand {
 // TODO showpid
 class ShowPidCommand : public BuiltInCommand {
  public:
-  ShowPidCommand(const char* cmd_line);
+  ShowPidCommand(const char* cmd_line) {}
   virtual ~ShowPidCommand() {}
   void execute() override;
 };
