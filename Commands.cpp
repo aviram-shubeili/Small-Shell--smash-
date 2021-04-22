@@ -151,7 +151,8 @@ void SmallShell::executeCommand(const char *cmd_line) {
     //if (cmd_line[0]=="") { // TODO handle forking external commands
     cmd->execute();
     //}
-
+    // todo should i check if we need to??
+    delete cmd;
     // TODO: Add your implementation here
     // for example:
     // Command* cmd = CreateCommand(cmd_line);
@@ -223,7 +224,6 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string *oldpwd) : Built
 
 ChangeDirCommand::~ChangeDirCommand() {
     // freeing malloc made by _parseCommandLine
-    // TODO: am i doing it currectly?
     for(int i = 0 ; i < num_arg ;++i) {
         free(arguments[i]);
     }
