@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
+#include <climits>
 
 using namespace std;
 
@@ -94,19 +95,19 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-//    if (firstWord.compare("pwd") == 0){
-//        return new GetCurrDirCommand(cmd_line);
-//    }
-     if (firstWord.compare("showpid") == 0){
+    if (firstWord.compare("pwd") == 0){
+        return new GetCurrDirCommand(cmd_line);
+    }
+    else if (firstWord.compare("showpid") == 0){
        return new ShowPidCommand(cmd_line);
     }
 //    else if (firstWord.compare("chprompt")==0){
 //        return new ChangePromptCommand(cmd_line);
 //    }
-/*
     else if (firstWord.compare("cd")==0){
-        return new ChangeDirCommand(cmd_line, cmd_s); // TODO fix
+        return new ChangeDirCommand(cmd_line); // TODO fix
     }
+/*
     else if (firstWord.compare("jobs")==0){
         return new JobsList(cmd_line); // external
     }
@@ -163,11 +164,23 @@ void SmallShell::executeCommand(const char *cmd_line) {
 //==================================== Commands ======================================//
 
 void ShowPidCommand::execute() {
-    cout << "smash pid is " + getpid() << "\n";
+    pid_t pid = getpid();
+    cout << "smash pid is "<< pid << "\n";
 }
 
 void GetCurrDirCommand::execute() {
-    char * buf;
-    get_current_dir_name();
-    cout << getcwd(buf, 32); // TODO what's wrong?
+    char buff[PATH_MAX];
+    cout << getcwd(buff, PATH_MAX) << endl;
+}
+
+ChangeDirCommand::ChangeDirCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
+    char* arguments[COMMAND_MAX_ARGS + 2]; // TODO remove magic number 2
+    int num_arg = _parseCommandLine(cmd_line, arguments);   // todo need to free this bird
+    if(num_arg != 2) {
+        cerr << "smash error: cd:too many arguments\n";
+    }
+    else {
+        s
+    }
+
 }
