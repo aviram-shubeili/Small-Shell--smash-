@@ -180,6 +180,7 @@ private:
     SmallShell();
 public:
     const std::string &getPromptLine() const;
+    pid_t getRunningCmd() const;
     Command *CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator

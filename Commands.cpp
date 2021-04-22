@@ -167,6 +167,9 @@ const string &SmallShell::getPromptLine() const {
     return prompt_line;
 }
 
+pid_t SmallShell::getRunningCmd() const {
+    return running_cmd;
+}
 
 
 //==================================== Commands ======================================//
