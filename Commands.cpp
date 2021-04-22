@@ -78,9 +78,9 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h 
 
-SmallShell::SmallShell() {
+SmallShell::SmallShell() : prompt_line("smash")
+{
 // TODO: add your implementation
-// TODO init prompt
 }
 
 SmallShell::~SmallShell() {
@@ -101,9 +101,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWord.compare("showpid") == 0){
         return new ShowPidCommand(cmd_line);
     }
-//    else if (firstWord.compare("chprompt")==0){
-//        return new ChangePromptCommand(cmd_line);
-//    }
+    else if (firstWord.compare("chprompt")==0){
+        return new ChangePromptCommand(cmd_line, &prompt_line);
+    }
     else if (firstWord.compare("cd")==0){
         return new ChangeDirCommand(cmd_line, &last_working_directory); // TODO fix
     }
@@ -160,9 +160,23 @@ void SmallShell::executeCommand(const char *cmd_line) {
     // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
+const string &SmallShell::getPromptLine() const {
+    return prompt_line;
+}
+
 
 
 //==================================== Commands ======================================//
+BuiltInCommand::~BuiltInCommand() {
+    // freeing malloc made by _parseCommandLine
+    for(int i = 0 ; i < num_arg ;++i) {
+        free(arguments[i]);
+    }
+}
+
+BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
+    num_arg = _parseCommandLine(cmd_line, arguments);
+}
 
 void ShowPidCommand::execute() {
     pid_t pid = getpid();
@@ -217,16 +231,19 @@ void ChangeDirCommand::execute() {
 }
 
 ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string *oldpwd) : BuiltInCommand(cmd_line),
-                                                                           oldpwd(oldpwd)
-{
-    num_arg = _parseCommandLine(cmd_line, arguments);   // todo need to free this bird
-}
+                                                                           oldpwd(oldpwd) {}
 
-ChangeDirCommand::~ChangeDirCommand() {
-    // freeing malloc made by _parseCommandLine
-    for(int i = 0 ; i < num_arg ;++i) {
-        free(arguments[i]);
+
+ChangePromptCommand::ChangePromptCommand(const char *cmd_line, std::string *smash_prompt) : BuiltInCommand(cmd_line),
+                                                                                            smash_prompt(smash_prompt) {}
+
+void ChangePromptCommand::execute() {
+         // resetting prompt
+    if(num_arg == 1) {
+        *smash_prompt = "smash";
     }
-
+        // setting new prompt
+    else {
+        *smash_prompt = arguments[1];
+    }
 }
-

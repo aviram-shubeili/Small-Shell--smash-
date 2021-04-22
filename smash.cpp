@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
     SmallShell& smash = SmallShell::getInstance();
     while(true) {
         char* parsing[22];
-        std::cout << "smash> ";
+        std::cout << smash.getPromptLine() << "> ";
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
         _parseCommandLine(cmd_line.c_str(), parsing);

@@ -9,12 +9,11 @@
     } \
     } while( 0 ) \
 
-int _parseCommandLine(const char* cmd_line, char** args);
-// TODO: add define DO_SYS
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (30)
 #define PATH_ARG 1
 const std::string WHITESPACE = " \n\r\t\f\v";
+int _parseCommandLine(const char* cmd_line, char** args);
 
 class Command {
 // TODO: Add your data members
@@ -28,9 +27,13 @@ public:
 };
 
 class BuiltInCommand : public Command {
+private:
+protected:
+    int num_arg;
+    char* arguments[COMMAND_MAX_ARGS];
 public:
-    BuiltInCommand(const char* cmd_line= "") {}
-    virtual ~BuiltInCommand() {}
+    BuiltInCommand(const char* cmd_line= "");
+    virtual ~BuiltInCommand();
 };
 
 class ExternalCommand : public Command {
@@ -60,9 +63,9 @@ public:
 
 // TODO: add chprompt
 class ChangePromptCommand : public BuiltInCommand {
-// TODO: Add your data members public:
+    std::string* smash_prompt;
 public:
-    ChangePromptCommand(const char* cmd_line); // TODO more arguments maybe
+    ChangePromptCommand(const char *cmd_line, std::string *smash_prompt); // TODO more arguments maybe
     virtual ~ChangePromptCommand() {}
     void execute() override;
 };
@@ -72,11 +75,9 @@ class ChangeDirCommand : public BuiltInCommand {
 private:
 // TODO: Add your data members public:
 public:
-    int num_arg;
-    char* arguments[COMMAND_MAX_ARGS];
     std::string* oldpwd;
     ChangeDirCommand(const char *cmd_line, std::string *oldpwd);
-    ~ChangeDirCommand() override;
+    virtual ~ChangeDirCommand() = default;
     void execute() override;
 };
 
@@ -170,10 +171,11 @@ public:
 
 class SmallShell {
 private:
-    std::string prompt; // todo init this
+    std::string prompt_line;
     std::string last_working_directory;
     SmallShell();
 public:
+    const std::string &getPromptLine() const;
     Command *CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator
