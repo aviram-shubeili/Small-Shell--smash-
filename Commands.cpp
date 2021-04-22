@@ -108,7 +108,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new ChangeDirCommand(cmd_line, &last_working_directory); // TODO fix
     }
     else {
-   //     return new ExternalCommand(cmd_line);
+        return new ExternalCommand(cmd_line);
     }
 /*
     else if (firstWord.compare("jobs")==0){
@@ -151,8 +151,21 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
 void SmallShell::executeCommand(const char *cmd_line) {
     Command *cmd = CreateCommand(cmd_line);
-    //if (cmd_line[0]=="") { // TODO handle forking external commands
-    cmd->execute();
+    if (typeid(*cmd)==typeid(ExternalCommand))
+    {
+        this->running_cmd = fork();
+        if (running_cmd==0){
+            setpgrp();
+            cmd->execute();
+        }
+        else{
+            waitpid(running_cmd,nullptr, 0);
+        }
+    }
+    else {
+        //if (cmd_line[0]=="") { // TODO handle forking external commands
+        cmd->execute();
+    }
     //}
     // todo should i check if we need to??
     delete cmd;
@@ -184,6 +197,8 @@ Command::~Command(){
     }
 }
 
+BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) { }
+
 BuiltInCommand::~BuiltInCommand() {
     // freeing malloc made by _parseCommandLine (should automaticly be done by ~Command)
     /*for(int i = 0 ; i < num_arg ;++i) {
@@ -191,7 +206,9 @@ BuiltInCommand::~BuiltInCommand() {
     }*/
 }
 
-BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) { }
+ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) { }
+
+ExternalCommand::~ExternalCommand()  {}
 
 void ShowPidCommand::execute() {
     pid_t pid = getpid();
@@ -264,5 +281,6 @@ void ChangePromptCommand::execute() {
 }
 
 void ExternalCommand::execute() {
-
+    char buff[PATH_MAX];
+    execl(getcwd(buff, PATH_MAX), reinterpret_cast<const char *>(this->arguments));
 }
