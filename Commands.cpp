@@ -23,57 +23,57 @@ using namespace std;
 
 string _ltrim(const std::string& s)
 {
-  size_t start = s.find_first_not_of(WHITESPACE);
-  return (start == std::string::npos) ? "" : s.substr(start);
+    size_t start = s.find_first_not_of(WHITESPACE);
+    return (start == std::string::npos) ? "" : s.substr(start);
 }
 
 string _rtrim(const std::string& s)
 {
-  size_t end = s.find_last_not_of(WHITESPACE);
-  return (end == std::string::npos) ? "" : s.substr(0, end + 1);
+    size_t end = s.find_last_not_of(WHITESPACE);
+    return (end == std::string::npos) ? "" : s.substr(0, end + 1);
 }
 
 string _trim(const std::string& s)
 {
-  return _rtrim(_ltrim(s));
+    return _rtrim(_ltrim(s));
 }
 
 int _parseCommandLine(const char* cmd_line, char** args) {
-  FUNC_ENTRY()
-  int i = 0;
-  std::istringstream iss(_trim(string(cmd_line)).c_str());
-  for(std::string s; iss >> s; ) {
-    args[i] = (char*)malloc(s.length()+1);
-    memset(args[i], 0, s.length()+1);
-    strcpy(args[i], s.c_str());
-    args[++i] = NULL;
-  }
-  return i;
+    FUNC_ENTRY()
+    int i = 0;
+    std::istringstream iss(_trim(string(cmd_line)).c_str());
+    for(std::string s; iss >> s; ) {
+        args[i] = (char*)malloc(s.length()+1);
+        memset(args[i], 0, s.length()+1);
+        strcpy(args[i], s.c_str());
+        args[++i] = NULL;
+    }
+    return i;
 
-  FUNC_EXIT()
+    FUNC_EXIT()
 }
 
 bool _isBackgroundCommand(const char* cmd_line) {
-  const string str(cmd_line);
-  return str[str.find_last_not_of(WHITESPACE)] == '&';
+    const string str(cmd_line);
+    return str[str.find_last_not_of(WHITESPACE)] == '&';
 }
 
 void _removeBackgroundSign(char* cmd_line) {
-  const string str(cmd_line);
-  // find last character other than spaces
-  unsigned int idx = str.find_last_not_of(WHITESPACE);
-  // if all characters are spaces then return
-  if (idx == string::npos) {
-    return;
-  }
-  // if the command line does not end with & then return
-  if (cmd_line[idx] != '&') {
-    return;
-  }
-  // replace the & (background sign) with space and then remove all tailing spaces.
-  cmd_line[idx] = ' ';
-  // truncate the command line string up to the last non-space character
-  cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
+    const string str(cmd_line);
+    // find last character other than spaces
+    unsigned int idx = str.find_last_not_of(WHITESPACE);
+    // if all characters are spaces then return
+    if (idx == string::npos) {
+        return;
+    }
+    // if the command line does not end with & then return
+    if (cmd_line[idx] != '&') {
+        return;
+    }
+    // replace the & (background sign) with space and then remove all tailing spaces.
+    cmd_line[idx] = ' ';
+    // truncate the command line string up to the last non-space character
+    cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
 // TODO: Add your implementation for classes in Commands.h 
@@ -99,13 +99,13 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
         return new GetCurrDirCommand(cmd_line);
     }
     else if (firstWord.compare("showpid") == 0){
-       return new ShowPidCommand(cmd_line);
+        return new ShowPidCommand(cmd_line);
     }
 //    else if (firstWord.compare("chprompt")==0){
 //        return new ChangePromptCommand(cmd_line);
 //    }
     else if (firstWord.compare("cd")==0){
-        return new ChangeDirCommand(cmd_line); // TODO fix
+        return new ChangeDirCommand(cmd_line, &last_working_directory); // TODO fix
     }
 /*
     else if (firstWord.compare("jobs")==0){
@@ -143,20 +143,20 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     return new ExternalCommand(cmd_line);
   }
 */
-  return nullptr;
+    return nullptr;
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
     Command *cmd = CreateCommand(cmd_line);
     //if (cmd_line[0]=="") { // TODO handle forking external commands
-        cmd->execute();
+    cmd->execute();
     //}
 
-  // TODO: Add your implementation here
-  // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
-  // Please note that you must fork smash process for some commands (e.g., external commands....)
+    // TODO: Add your implementation here
+    // for example:
+    // Command* cmd = CreateCommand(cmd_line);
+    // cmd->execute();
+    // Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
 
@@ -173,14 +173,60 @@ void GetCurrDirCommand::execute() {
     cout << getcwd(buff, PATH_MAX) << endl;
 }
 
-ChangeDirCommand::ChangeDirCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
-    char* arguments[COMMAND_MAX_ARGS + 2]; // TODO remove magic number 2
-    int num_arg = _parseCommandLine(cmd_line, arguments);   // todo need to free this bird
-    if(num_arg != 2) {
-        cerr << "smash error: cd:too many arguments\n";
+
+void ChangeDirCommand::execute() {
+    std::string path;
+    // no arguments - does nothing
+    if(num_arg == 1) {
+        return;
     }
+    // too many args
+    if (num_arg != 2) {
+        cerr << "smash error: cd: too many arguments\n";
+        return;
+    }
+        // 2 args :]
     else {
-        s
+        // go back to old pwd
+        if(strcmp(arguments[1], "-") == 0) {
+            // no where to go back
+            if(oldpwd->empty()) {
+                cerr << "smash error: cd: OLDPWD not set\n";
+                return;
+            }
+            else {
+                path = *oldpwd;
+            }
+        }
+        else {
+            path = arguments[PATH_ARG];
+        }
+        // saving oldpwd
+        char buff[PATH_MAX];
+        getcwd(buff, PATH_MAX);
+        // executing with feedback from syscall
+        if(chdir(path.c_str()) == -1) {
+            perror("smash error: chdir failed");
+            return;
+        }
+        // if chdir succeeded - update oldpwd
+        *oldpwd = buff;
+
+    }
+}
+
+ChangeDirCommand::ChangeDirCommand(const char *cmd_line, string *oldpwd) : BuiltInCommand(cmd_line),
+                                                                           oldpwd(oldpwd)
+{
+    num_arg = _parseCommandLine(cmd_line, arguments);   // todo need to free this bird
+}
+
+ChangeDirCommand::~ChangeDirCommand() {
+    // freeing malloc made by _parseCommandLine
+    // TODO: am i doing it currectly?
+    for(int i = 0 ; i < num_arg ;++i) {
+        free(arguments[i]);
     }
 
 }
+

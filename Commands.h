@@ -12,7 +12,8 @@
 int _parseCommandLine(const char* cmd_line, char** args);
 // TODO: add define DO_SYS
 #define COMMAND_ARGS_MAX_LENGTH (200)
-#define COMMAND_MAX_ARGS (20)
+#define COMMAND_MAX_ARGS (30)
+#define PATH_ARG 1
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 class Command {
@@ -71,8 +72,11 @@ class ChangeDirCommand : public BuiltInCommand {
 private:
 // TODO: Add your data members public:
 public:
-    explicit ChangeDirCommand(const char *cmd_line);
-    virtual ~ChangeDirCommand() {}
+    int num_arg;
+    char* arguments[COMMAND_MAX_ARGS];
+    std::string* oldpwd;
+    ChangeDirCommand(const char *cmd_line, std::string *oldpwd);
+    ~ChangeDirCommand() override;
     void execute() override;
 };
 
@@ -166,7 +170,8 @@ public:
 
 class SmallShell {
 private:
-    std::string prompt;
+    std::string prompt; // todo init this
+    std::string last_working_directory;
     SmallShell();
 public:
     Command *CreateCommand(const char* cmd_line);
