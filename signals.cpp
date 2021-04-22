@@ -6,14 +6,30 @@
 using namespace std;
 
 void ctrlZHandler(int sig_num) {
-	// TODO: Add your implementation
+    cout << "smash: got ctrl-Z" << endl;
+    SmallShell& smash = SmallShell::getInstance();
+    // checks if there is an external command running:
+    if(smash.getRunningCmd() != NO_RUNNING_CMD) {
+        kill(smash.getRunningCmd(),SIGSTOP);
+    }
 }
 
 void ctrlCHandler(int sig_num) {
-  // TODO: Add your implementation
+    cout << "smash: got ctrl-C" << endl;
+    SmallShell& smash = SmallShell::getInstance();
+    // checks if there is an external command running:
+    if(smash.getRunningCmd() != NO_RUNNING_CMD) {
+        kill(smash.getRunningCmd(),SIGKILL);
+    }
+
 }
 
 void alarmHandler(int sig_num) {
-  // TODO: Add your implementation
+    cout << "smash got an alarm" << endl;
+    SmallShell& smash = SmallShell::getInstance();
+    pid_t alarm_sender = 1;     // todo change this!
+    // todo check who sent the alaram????
+    kill(alarm_sender,SIGKILL);
+    cout << "smash" << "" << "timed out!" << endl;
 }
 

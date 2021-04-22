@@ -1,6 +1,7 @@
 #ifndef SMASH__SIGNALS_H_
 #define SMASH__SIGNALS_H_
 
+#define NO_RUNNING_CMD 0
 void ctrlZHandler(int sig_num);
 void ctrlCHandler(int sig_num);
 void alarmHandler(int sig_num);
