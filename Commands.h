@@ -17,9 +17,12 @@ int _parseCommandLine(const char* cmd_line, char** args);
 
 class Command {
 // TODO: Add your data members
+protected:
+    int num_arg;
+    char* arguments[COMMAND_MAX_ARGS];
 public:
-    Command(const char* cmd_line= "") {}
-    virtual ~Command() = default;
+    Command(const char* cmd_line= "");
+    virtual ~Command();
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
@@ -29,8 +32,8 @@ public:
 class BuiltInCommand : public Command {
 private:
 protected:
-    int num_arg;
-    char* arguments[COMMAND_MAX_ARGS];
+//    int num_arg;
+//    char* arguments[COMMAND_MAX_ARGS];
 public:
     BuiltInCommand(const char* cmd_line= "");
     virtual ~BuiltInCommand();
@@ -173,6 +176,7 @@ class SmallShell {
 private:
     std::string prompt_line;
     std::string last_working_directory;
+    pid_t running_cmd;
     SmallShell();
 public:
     const std::string &getPromptLine() const;

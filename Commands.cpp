@@ -107,6 +107,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWord.compare("cd")==0){
         return new ChangeDirCommand(cmd_line, &last_working_directory); // TODO fix
     }
+    else {
+   //     return new ExternalCommand(cmd_line);
+    }
 /*
     else if (firstWord.compare("jobs")==0){
         return new JobsList(cmd_line); // external
@@ -167,16 +170,25 @@ const string &SmallShell::getPromptLine() const {
 
 
 //==================================== Commands ======================================//
-BuiltInCommand::~BuiltInCommand() {
+Command::Command(const char *cmd_line) {
+    num_arg = _parseCommandLine(cmd_line, arguments);
+}
+
+Command::~Command(){
     // freeing malloc made by _parseCommandLine
     for(int i = 0 ; i < num_arg ;++i) {
         free(arguments[i]);
     }
 }
 
-BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
-    num_arg = _parseCommandLine(cmd_line, arguments);
+BuiltInCommand::~BuiltInCommand() {
+    // freeing malloc made by _parseCommandLine (should automaticly be done by ~Command)
+    /*for(int i = 0 ; i < num_arg ;++i) {
+        free(arguments[i]);
+    }*/
 }
+
+BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) { }
 
 void ShowPidCommand::execute() {
     pid_t pid = getpid();
@@ -246,4 +258,8 @@ void ChangePromptCommand::execute() {
     else {
         *smash_prompt = arguments[1];
     }
+}
+
+void ExternalCommand::execute() {
+
 }
