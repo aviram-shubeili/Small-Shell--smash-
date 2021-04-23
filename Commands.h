@@ -193,6 +193,8 @@ public:
     }
     ~SmallShell();
     void executeCommand(const char* cmd_line);
+
+    void setRunningCmd(pid_t runningCmd);
     // TODO: add extra methods as needed
 };
 

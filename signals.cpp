@@ -11,6 +11,8 @@ void ctrlZHandler(int sig_num) {
     // checks if there is an external command running:
     if(smash.getRunningCmd() != NO_RUNNING_CMD) {
         kill(smash.getRunningCmd(),SIGSTOP);
+        cout << "smash: process " << smash.getRunningCmd() << " was stopped\n";
+        smash.setRunningCmd(NO_RUNNING_CMD);
     }
 }
 
@@ -20,6 +22,8 @@ void ctrlCHandler(int sig_num) {
     // checks if there is an external command running:
     if(smash.getRunningCmd() != NO_RUNNING_CMD) {
         kill(smash.getRunningCmd(),SIGKILL);
+        cout << "smash: process " << smash.getRunningCmd() << " was killed\n";
+        smash.setRunningCmd(NO_RUNNING_CMD);
     }
 
 }

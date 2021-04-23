@@ -166,7 +166,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
         else{
             // father code
             running_cmd = p;
-            waitpid(running_cmd,nullptr, 0);
+            waitpid(running_cmd,nullptr, WUNTRACED);
         }
     }
     else {
@@ -189,6 +189,10 @@ const string &SmallShell::getPromptLine() const {
 
 pid_t SmallShell::getRunningCmd() const {
     return running_cmd;
+}
+
+void SmallShell::setRunningCmd(pid_t runningCmd) {
+    running_cmd = runningCmd;
 }
 
 
