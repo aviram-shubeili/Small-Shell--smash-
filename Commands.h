@@ -17,12 +17,12 @@ int _parseCommandLine(const char* cmd_line, char** args);
 
 class Command {
 // TODO: Add your data members
-protected:
-    int num_arg;
-    char* arguments[COMMAND_MAX_ARGS];
+//protected:
+//    int num_arg;
+//    char* arguments[COMMAND_MAX_ARGS];
 public:
-    Command(const char* cmd_line= "");
-    virtual ~Command();
+    Command(const char* cmd_line= "") {}
+    virtual ~Command() {}
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
@@ -32,16 +32,17 @@ public:
 class BuiltInCommand : public Command {
 private:
 protected:
-//    int num_arg;
-//    char* arguments[COMMAND_MAX_ARGS];
+    int num_arg;
+    char* arguments[COMMAND_MAX_ARGS];
 public:
-    BuiltInCommand(const char* cmd_line= "");
+    BuiltInCommand(const char* cmd_line);
     virtual ~BuiltInCommand();
 };
 
 class ExternalCommand : public Command {
     std::string bash_cmd;
 public:
+    bool is_bg_cmd;
     ExternalCommand(const char* cmd_line);
     virtual ~ExternalCommand();
     void execute() override;
@@ -88,7 +89,7 @@ public:
 // TODO pwd
 class GetCurrDirCommand : public BuiltInCommand {
 public:
-    GetCurrDirCommand(const char* cmd_line ) {}
+    GetCurrDirCommand(const char* cmd_line ) : BuiltInCommand(cmd_line) {}
     virtual ~GetCurrDirCommand() {}
     void execute() override;
 };
@@ -96,7 +97,7 @@ public:
 // TODO showpid
 class ShowPidCommand : public BuiltInCommand {
 public:
-    ShowPidCommand(const char* cmd_line) {}
+    ShowPidCommand(const char* cmd_line) : BuiltInCommand(cmd_line) {}
     virtual ~ShowPidCommand() {}
     void execute() override;
 };

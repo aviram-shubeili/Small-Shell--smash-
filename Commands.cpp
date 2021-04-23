@@ -55,10 +55,11 @@ int _parseCommandLine(const char* cmd_line, char** args) {
 
 bool _isBackgroundCommand(const char* cmd_line) {
     const string str(cmd_line);
-    return str[str.find_last_not_of(WHITESPACE)] == '&';
+    size_t idx = str.find_last_not_of(WHITESPACE);
+    return idx == string::npos ? false : str[idx] == '&';
 }
 
-void _removeBackgroundSign(char* cmd_line) {
+void _removeBackgroundSign(string& cmd_line) {
     const string str(cmd_line);
     // find last character other than spaces
     unsigned int idx = str.find_last_not_of(WHITESPACE);
@@ -166,7 +167,10 @@ void SmallShell::executeCommand(const char *cmd_line) {
         else{
             // father code
             running_cmd = p;
-            waitpid(running_cmd,nullptr, WUNTRACED);
+            if(not (dynamic_cast<ExternalCommand*>(cmd)->is_bg_cmd)) {
+                // if its a foreground command than wait for it to end/stop
+                waitpid(running_cmd,nullptr, WUNTRACED);
+            }
         }
     }
     else {
@@ -197,27 +201,30 @@ void SmallShell::setRunningCmd(pid_t runningCmd) {
 
 
 //==================================== Commands ======================================//
-Command::Command(const char *cmd_line) {
-    num_arg = _parseCommandLine(cmd_line, arguments);
+
+
+BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
+    string temp(cmd_line);
+    // ignore & sign
+    _removeBackgroundSign(temp);
+    num_arg = _parseCommandLine(temp.c_str(), arguments);
 }
 
-Command::~Command(){
-    // freeing malloc made by _parseCommandLine
+BuiltInCommand::~BuiltInCommand() {
+    // freeilsng malloc made by _parseCommandLine (should automaticly be done by ~Command)
     for(int i = 0 ; i < num_arg ;++i) {
         free(arguments[i]);
     }
 }
 
-BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) { }
+ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line),
+                                                         bash_cmd(cmd_line) {
+    is_bg_cmd = _isBackgroundCommand(cmd_line);
+    if(is_bg_cmd) {
+        _removeBackgroundSign(bash_cmd);
+    }
 
-BuiltInCommand::~BuiltInCommand() {
-    // freeing malloc made by _parseCommandLine (should automaticly be done by ~Command)
-    /*for(int i = 0 ; i < num_arg ;++i) {
-        free(arguments[i]);
-    }*/
 }
-
-ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line), bash_cmd(cmd_line) {}
 
 ExternalCommand::~ExternalCommand()  {}
 
@@ -281,7 +288,7 @@ ChangePromptCommand::ChangePromptCommand(const char *cmd_line, std::string *smas
                                                                                             smash_prompt(smash_prompt) {}
 
 void ChangePromptCommand::execute() {
-         // resetting prompt
+    // resetting prompt
     if(num_arg == 1) {
         *smash_prompt = "smash";
     }
