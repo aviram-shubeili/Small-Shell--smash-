@@ -7,3 +7,6 @@ add_executable(smash
         Commands.cpp
         signals.cpp
         smash.cpp)
+
+add_executable(playground
+        play.cpp)

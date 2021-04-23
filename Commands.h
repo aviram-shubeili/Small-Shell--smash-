@@ -40,6 +40,7 @@ public:
 };
 
 class ExternalCommand : public Command {
+    std::string bash_cmd;
 public:
     ExternalCommand(const char* cmd_line);
     virtual ~ExternalCommand();

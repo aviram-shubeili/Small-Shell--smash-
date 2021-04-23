@@ -26,7 +26,7 @@ void ctrlCHandler(int sig_num) {
 
 void alarmHandler(int sig_num) {
     cout << "smash got an alarm" << endl;
-    SmallShell& smash = SmallShell::getInstance();
+//    SmallShell& smash = SmallShell::getInstance();
     pid_t alarm_sender = 1;     // todo change this!
     // todo check who sent the alaram????
     kill(alarm_sender,SIGKILL);

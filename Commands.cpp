@@ -153,12 +153,19 @@ void SmallShell::executeCommand(const char *cmd_line) {
     Command *cmd = CreateCommand(cmd_line);
     if (typeid(*cmd)==typeid(ExternalCommand))
     {
-        this->running_cmd = fork();
-        if (running_cmd==0){
+        pid_t p = fork();
+        if (p == -1) {
+            // fork failed
+            perror("smash: fork failed");
+        }
+        else if (p == 0){
+            // child code
             setpgrp();
             cmd->execute();
         }
         else{
+            // father code
+            running_cmd = p;
             waitpid(running_cmd,nullptr, 0);
         }
     }
@@ -206,7 +213,7 @@ BuiltInCommand::~BuiltInCommand() {
     }*/
 }
 
-ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) { }
+ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line), bash_cmd(cmd_line) {}
 
 ExternalCommand::~ExternalCommand()  {}
 
@@ -281,6 +288,5 @@ void ChangePromptCommand::execute() {
 }
 
 void ExternalCommand::execute() {
-    char buff[PATH_MAX];
-    execl(getcwd(buff, PATH_MAX), reinterpret_cast<const char *>(this->arguments));
+    execl("/bin/bash", "/bin/bash", "-c", bash_cmd.c_str(), NULL);
 }
