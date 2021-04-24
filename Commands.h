@@ -1,6 +1,7 @@
 #ifndef SMASH_COMMAND_H_
 #define SMASH_COMMAND_H_
 #include <vector>
+#include <time.h>
 
 #define DO_SYS( syscall ) do { \
     if((syscall) == -1 ) { \
@@ -12,6 +13,8 @@
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (30)
 #define PATH_ARG 1
+#define MAX_JOBS (101)
+
 const std::string WHITESPACE = " \n\r\t\f\v";
 int _parseCommandLine(const char* cmd_line, char** args);
 
@@ -115,14 +118,31 @@ class QuitCommand : public BuiltInCommand {
 
 
 class JobsList {
-public:
     class JobEntry {
-        // TODO: Add your data members
+    private:
+        int job_id;
+        Command* cmd;
+        time_t *Time;
+        bool is_stopped;
+    public:
+        JobEntry(int job_id, Command* cmd, bool is_stopped=false) : job_id(job_id), cmd(cmd), is_stopped(is_stopped) {
+            time(this->Time);
+        }
+        ~JobEntry() = default; // TODO commands are deleted elsewhere at the moment, figure out if it needs changing
+        int getJobId() { return this->job_id; }
+        Command* getCommand() { return this->cmd; }
+        time_t* getTime() { return this->Time; }
+        bool isStopped() { return this->is_stopped; }
+        void Stop() { this->is_stopped = true;}
     };
     // TODO: Add your data members
+private:
+    JobEntry** job_arr;
+    int next_id;
+    std::vector<int> to_clear;
 public:
     JobsList();
-    ~JobsList();
+    ~JobsList(){ delete[] job_arr; }
     void addJob(Command* cmd, bool isStopped = false);
     void printJobsList();
     void killAllJobs();

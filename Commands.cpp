@@ -301,3 +301,70 @@ void ChangePromptCommand::execute() {
 void ExternalCommand::execute() {
     execl("/bin/bash", "/bin/bash", "-c", bash_cmd.c_str(), NULL);
 }
+
+
+//=========================================Jobs List===========================================//
+
+JobsList::JobsList() : job_arr(new JobEntry* [MAX_JOBS]), next_id(1), to_clear(std::vector<int>(NULL)) {
+    //TODO loop to init arr to nullptrs or is this enough?
+}
+
+void JobsList::addJob(Command* cmd, bool isStopped){
+    job_arr[next_id] = new JobEntry(next_id, cmd);
+    for (int i=next_id+1; i<MAX_JOBS; i++){
+        if (job_arr[i] == nullptr) {
+            next_id = i;
+            break;
+        }
+    }
+}
+
+void JobsList::printJobsList(){
+    for (int i=0; i<MAX_JOBS; i++){
+        if (job_arr[i]) {
+            std::cout << "[" << job_arr[i]->getJobId() << "] ";
+            std::cout << job_arr[i]->getCommand() << " : ";
+            std::cout << getpid() << " "; // TODO how to get pid of a command?
+            std::cout << difftime(time(nullptr), *(job_arr[i]->getTime())) << " secs ";
+            if (job_arr[i]->isStopped()){
+                std::cout << "(stopped)";
+            }
+            std::cout << std::endl;
+        }
+    }
+}
+
+void JobsList::killAllJobs(){
+    SmallShell& smash = SmallShell::getInstance();
+    for (int i=0; i<MAX_JOBS; i++){
+        if (job_arr[i]){
+            //TODO send kill signal to job_arr[i]->Command
+        }
+    }
+}
+
+void JobsList::removeFinishedJobs(){
+    for (std::vector<int>::iterator it = this->to_clear.begin(); it != this->to_clear.end(); ++it){
+        if ((*it)<this->next_id) { this->next_id = *it; } // updates the new lowest free job id
+        delete (job_arr[(*it)]);
+        this->job_arr[(*it)] = nullptr;
+        //TODO do we need to do additional operations?
+    }
+    to_clear.clear();
+}
+JobsList::JobEntry* JobsList::getJobById(int jobId){
+    return this->job_arr[jobId];
+}
+void JobsList::removeJobById(int jobId){
+    for (std::vector<int>::iterator it = this->to_clear.begin(); it != this->to_clear.end(); ++it){
+        if (*it == jobId) {
+            to_clear.erase(it);
+            break;
+        }
+    }
+    delete(job_arr[jobId]);
+    this->job_arr[jobId] = nullptr;
+    if (jobId < this->next_id) { this->next_id = jobId; }
+}
+JobsList::JobEntry* JobsList::getLastJob(int* lastJobId){} // TODO last job that was done? or something else?
+JobsList::JobEntry* JobsList::getLastStoppedJob(int *jobId){}
