@@ -109,13 +109,13 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWord.compare("cd")==0){
         return std::shared_ptr<Command>(new ChangeDirCommand(cmd_line, &last_working_directory)); // TODO fix
     }
+    else if (firstWord.compare("jobs")==0){
+        return std::shared_ptr<Command>(new JobsCommand(cmd_line,&jobs));
+    }
     else {
         return std::shared_ptr<Command>(new ExternalCommand(cmd_line));
     }
 /*
-    else if (firstWord.compare("jobs")==0){
-        return new JobsList(cmd_line); // external
-    }
     else if (firstWord.compare("kill")==0){
         return new KillCommand(cmd_line); // external
     }
