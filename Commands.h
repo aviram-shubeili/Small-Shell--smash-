@@ -2,6 +2,8 @@
 #define SMASH_COMMAND_H_
 #include <vector>
 #include <time.h>
+#include <memory>
+#include <ostream>
 
 #define DO_SYS( syscall ) do { \
     if((syscall) == -1 ) { \
@@ -20,15 +22,21 @@ int _parseCommandLine(const char* cmd_line, char** args);
 
 class Command {
 // TODO: Add your data members
-//protected:
-//    int num_arg;
-//    char* arguments[COMMAND_MAX_ARGS];
+    std::string cmd_line;
 public:
-    Command(const char* cmd_line= "") {}
+    friend std::ostream &operator<<(std::ostream &os, const Command &command);
+
+private:
+    pid_t cmd_pid;
+public:
+    explicit Command(const char* cmd_line= "") : cmd_line(cmd_line),
+                                                 cmd_pid(0) {}
     virtual ~Command() {}
     virtual void execute() = 0;
     //virtual void prepare();
     //virtual void cleanup();
+    void setCmdPid(pid_t cmdPid);
+    pid_t getCmdPid() const;
     // TODO: Add your extra methods if needed
 };
 
@@ -46,8 +54,8 @@ class ExternalCommand : public Command {
     std::string bash_cmd;
 public:
     bool is_bg_cmd;
-    ExternalCommand(const char* cmd_line);
-    virtual ~ExternalCommand();
+    explicit ExternalCommand(const char* cmd_line);
+    ~ExternalCommand() override = default;
     void execute() override;
 };
 
@@ -69,7 +77,7 @@ public:
     //void cleanup() override;
 };
 
-// TODO: add chprompt
+
 class ChangePromptCommand : public BuiltInCommand {
     std::string* smash_prompt;
 public:
@@ -78,10 +86,10 @@ public:
     void execute() override;
 };
 
-// TODO cd
+
 class ChangeDirCommand : public BuiltInCommand {
 private:
-// TODO: Add your data members public:
+
 public:
     std::string* oldpwd;
     ChangeDirCommand(const char *cmd_line, std::string *oldpwd);
@@ -89,7 +97,7 @@ public:
     void execute() override;
 };
 
-// TODO pwd
+
 class GetCurrDirCommand : public BuiltInCommand {
 public:
     GetCurrDirCommand(const char* cmd_line ) : BuiltInCommand(cmd_line) {}
@@ -97,7 +105,7 @@ public:
     void execute() override;
 };
 
-// TODO showpid
+
 class ShowPidCommand : public BuiltInCommand {
 public:
     ShowPidCommand(const char* cmd_line) : BuiltInCommand(cmd_line) {}
@@ -120,37 +128,40 @@ class QuitCommand : public BuiltInCommand {
 class JobsList {
     class JobEntry {
     private:
-        int job_id;
-        Command* cmd;
-        time_t *Time;
+        std::shared_ptr<Command> cmd;
+        time_t time_executed;
         bool is_stopped;
     public:
-        JobEntry(int job_id, Command* cmd, bool is_stopped=false) : job_id(job_id), cmd(cmd), is_stopped(is_stopped) {
-            time(this->Time);
-        }
-        ~JobEntry() = default; // TODO commands are deleted elsewhere at the moment, figure out if it needs changing
-        int getJobId() { return this->job_id; }
-        Command* getCommand() { return this->cmd; }
-        time_t* getTime() { return this->Time; }
-        bool isStopped() { return this->is_stopped; }
-        void Stop() { this->is_stopped = true;}
+
+
+    private:
+        pid_t job_pid;
+    public:
+        JobEntry(std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped = false);
+        ~JobEntry() = default;
+        std::shared_ptr<Command> getCommand() { return cmd; }
+        time_t getTime() const { return time_executed; }
+        bool isStopped() const { return is_stopped; }
+        pid_t getJobPid() const { return  job_pid; }
+        void setIsStopped(bool isStopped);
     };
     // TODO: Add your data members
 private:
-    JobEntry** job_arr;
-    int next_id;
-    std::vector<int> to_clear;
+    std::vector<std::shared_ptr<JobEntry>> jobs;
+    int getMinFreeID();
+//    std::vector<int> to_clear;
 public:
     JobsList();
-    ~JobsList(){ delete[] job_arr; }
-    void addJob(Command* cmd, bool isStopped = false);
+    ~JobsList() = default;
+    void addJob(std::shared_ptr<Command> cmd, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
-    JobEntry * getJobById(int jobId);
+    std::shared_ptr<JobEntry> getJobById(int jobId);
+    // TODO: getByPID?
     void removeJobById(int jobId);
-    JobEntry * getLastJob(int* lastJobId);
-    JobEntry *getLastStoppedJob(int *jobId);
+//    std::shared_ptr<JobEntry> getLastJob(int* lastJobId); // TODO : do we need this?
+    std::shared_ptr<JobEntry> getLastStoppedJob(int *jobId);
     // TODO: Add extra methods or modify existing ones as needed
 };
 
@@ -203,7 +214,7 @@ private:
 public:
     const std::string &getPromptLine() const;
     pid_t getRunningCmd() const;
-    Command *CreateCommand(const char* cmd_line);
+    std::shared_ptr<Command> CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor
     void operator=(SmallShell const&)  = delete; // disable = operator
     static SmallShell& getInstance() // make SmallShell singleton

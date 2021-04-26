@@ -1,13 +1,14 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
+#include <memory>
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
 #include <climits>
-
+#include <assert.h>
 using namespace std;
 
 #if 0
@@ -91,25 +92,25 @@ SmallShell::~SmallShell() {
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
-Command * SmallShell::CreateCommand(const char* cmd_line) {
+std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
 
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
     if (firstWord.compare("pwd") == 0){
-        return new GetCurrDirCommand(cmd_line);
+        return std::shared_ptr<Command>(new GetCurrDirCommand(cmd_line));
     }
     else if (firstWord.compare("showpid") == 0){
-        return new ShowPidCommand(cmd_line);
+        return std::shared_ptr<Command>(new ShowPidCommand(cmd_line));
     }
     else if (firstWord.compare("chprompt")==0){
-        return new ChangePromptCommand(cmd_line, &prompt_line);
+        return std::shared_ptr<Command>(new ChangePromptCommand(cmd_line, &prompt_line));
     }
     else if (firstWord.compare("cd")==0){
-        return new ChangeDirCommand(cmd_line, &last_working_directory); // TODO fix
+        return std::shared_ptr<Command>(new ChangeDirCommand(cmd_line, &last_working_directory)); // TODO fix
     }
     else {
-        return new ExternalCommand(cmd_line);
+        return std::shared_ptr<Command>(new ExternalCommand(cmd_line));
     }
 /*
     else if (firstWord.compare("jobs")==0){
@@ -151,8 +152,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-    Command *cmd = CreateCommand(cmd_line);
-    if (typeid(*cmd)==typeid(ExternalCommand))
+    std::shared_ptr<Command> cmd = CreateCommand(cmd_line);
+
+    // External commands special handling
+    if (typeid(*cmd) == typeid(ExternalCommand))
     {
         pid_t p = fork();
         if (p == -1) {
@@ -167,7 +170,9 @@ void SmallShell::executeCommand(const char *cmd_line) {
         else{
             // father code
             running_cmd = p;
-            if(not (dynamic_cast<ExternalCommand*>(cmd)->is_bg_cmd)) {
+            // updating son's pid
+            cmd->setCmdPid(p);
+            if(not (dynamic_cast<ExternalCommand*>(cmd.get())->is_bg_cmd)) {
                 // if its a foreground command than wait for it to end/stop
                 waitpid(running_cmd,nullptr, WUNTRACED);
             }
@@ -178,8 +183,6 @@ void SmallShell::executeCommand(const char *cmd_line) {
         cmd->execute();
     }
     //}
-    // todo should i check if we need to??
-    delete cmd;
     // TODO: Add your implementation here
     // for example:
     // Command* cmd = CreateCommand(cmd_line);
@@ -211,26 +214,30 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
 }
 
 BuiltInCommand::~BuiltInCommand() {
-    // freeilsng malloc made by _parseCommandLine (should automaticly be done by ~Command)
+    // freeing malloc made by _parseCommandLine (should automaticly be done by ~Command)
     for(int i = 0 ; i < num_arg ;++i) {
         free(arguments[i]);
     }
 }
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line),
-                                                         bash_cmd(cmd_line) {
+                                                         bash_cmd(cmd_line)
+{
     is_bg_cmd = _isBackgroundCommand(cmd_line);
     if(is_bg_cmd) {
         _removeBackgroundSign(bash_cmd);
     }
+    //TODO: this init will be overridden as soon as the wrapper function will fork!!
+    //   cmd_pid = 0;
+
 
 }
 
-ExternalCommand::~ExternalCommand()  {}
+
 
 void ShowPidCommand::execute() {
     pid_t pid = getpid();
-    cout << "smash pid is "<< pid << "\n";
+    cout << "smash job_pid is "<< pid << "\n";
 }
 
 void GetCurrDirCommand::execute() {
@@ -302,31 +309,51 @@ void ExternalCommand::execute() {
     execl("/bin/bash", "/bin/bash", "-c", bash_cmd.c_str(), NULL);
 }
 
-
-//=========================================Jobs List===========================================//
-
-JobsList::JobsList() : job_arr(new JobEntry* [MAX_JOBS]), next_id(1), to_clear(std::vector<int>(NULL)) {
-    //TODO loop to init arr to nullptrs or is this enough?
+void Command::setCmdPid(pid_t cmdPid) {
+    cmd_pid = cmdPid;
 }
 
-void JobsList::addJob(Command* cmd, bool isStopped){
-    job_arr[next_id] = new JobEntry(next_id, cmd);
-    for (int i=next_id+1; i<MAX_JOBS; i++){
-        if (job_arr[i] == nullptr) {
-            next_id = i;
-            break;
-        }
-    }
+pid_t Command::getCmdPid() const {
+    return cmd_pid;
+}
+
+ostream &operator<<(ostream &os, const Command &command) {
+    os << command.cmd_line;
+    return os;
+}
+
+
+//=========================================Jobs List===========================================//
+//==============Job Entry==========//
+
+JobsList::JobEntry::JobEntry
+        (std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped) : cmd(cmd),
+                                                                    is_stopped(is_stopped),
+                                                                    job_pid(p)
+{
+    // update  executed time
+    time(&time_executed);
+}
+void JobsList::JobEntry::setIsStopped(bool isStopped) {
+    is_stopped = isStopped;
+}
+
+
+JobsList::JobsList() : jobs(MAX_JOBS) {}
+
+void JobsList::addJob(std::shared_ptr<Command> cmd, bool isStopped){
+    jobs[getMinFreeID()] = std::make_shared<JobEntry>(cmd, cmd->getCmdPid());
 }
 
 void JobsList::printJobsList(){
-    for (int i=0; i<MAX_JOBS; i++){
-        if (job_arr[i]) {
-            std::cout << "[" << job_arr[i]->getJobId() << "] ";
-            std::cout << job_arr[i]->getCommand() << " : ";
-            std::cout << getpid() << " "; // TODO how to get pid of a command?
-            std::cout << difftime(time(nullptr), *(job_arr[i]->getTime())) << " secs ";
-            if (job_arr[i]->isStopped()){
+    removeFinishedJobs();
+    for (int i = 1; i < MAX_JOBS; i++){
+        if (jobs[i]) {
+            std::cout << "[" << i << "] ";
+            std::cout << *(jobs[i]->getCommand()) << " : ";
+            std::cout << jobs[i]->getJobPid() << " ";
+            std::cout << difftime(time(nullptr), jobs[i]->getTime()) << " secs ";
+            if (jobs[i]->isStopped()){
                 std::cout << "(stopped)";
             }
             std::cout << std::endl;
@@ -335,36 +362,59 @@ void JobsList::printJobsList(){
 }
 
 void JobsList::killAllJobs(){
-    SmallShell& smash = SmallShell::getInstance();
     for (int i=0; i<MAX_JOBS; i++){
-        if (job_arr[i]){
-            //TODO send kill signal to job_arr[i]->Command
+        if (jobs[i]){
+            kill(jobs[i]->getJobPid(),SIGKILL);
+            jobs[i] = nullptr;
         }
     }
 }
 
 void JobsList::removeFinishedJobs(){
-    for (std::vector<int>::iterator it = this->to_clear.begin(); it != this->to_clear.end(); ++it){
-        if ((*it)<this->next_id) { this->next_id = *it; } // updates the new lowest free job id
-        delete (job_arr[(*it)]);
-        this->job_arr[(*it)] = nullptr;
-        //TODO do we need to do additional operations?
-    }
-    to_clear.clear();
-}
-JobsList::JobEntry* JobsList::getJobById(int jobId){
-    return this->job_arr[jobId];
-}
-void JobsList::removeJobById(int jobId){
-    for (std::vector<int>::iterator it = this->to_clear.begin(); it != this->to_clear.end(); ++it){
-        if (*it == jobId) {
-            to_clear.erase(it);
-            break;
+    for (int i=0; i<MAX_JOBS; i++){
+        if (jobs[i]){
+            int status;
+            waitpid(jobs[i]->getJobPid(), &status, WNOHANG);
+            // if status == pid <--> process exited (finished)
+            if(status == jobs[i]->getJobPid()) {
+                jobs[i] = nullptr;
+            }
         }
     }
-    delete(job_arr[jobId]);
-    this->job_arr[jobId] = nullptr;
-    if (jobId < this->next_id) { this->next_id = jobId; }
 }
-JobsList::JobEntry* JobsList::getLastJob(int* lastJobId){} // TODO last job that was done? or something else?
-JobsList::JobEntry* JobsList::getLastStoppedJob(int *jobId){}
+shared_ptr<JobsList::JobEntry> JobsList::getJobById(int jobId){
+    return jobs[jobId];
+}
+//  Warning! this doesnt kill process! only removes from list.
+// user should have a pointer to job (via getJobById) before removing from list.
+void JobsList::removeJobById(int jobId){
+    if( 0 < jobId and jobId < MAX_JOBS) {
+        jobs[jobId] = nullptr;
+    }
+}
+
+//shared_ptr<JobEntry> JobsList::getLastJob(int* lastJobId){} // TODO last job that was done? or something else?
+
+shared_ptr<JobsList::JobEntry> JobsList::getLastStoppedJob(int *jobId) {
+    removeFinishedJobs();
+    for (int i = MAX_JOBS - 1; i > 0; --i) {
+        if (jobs[i] and jobs[i]->isStopped()) {
+            return jobs[i];
+        }
+    }
+    return nullptr;
+}
+
+int JobsList::getMinFreeID() {
+    for (int i = 1; i < MAX_JOBS; i++) {
+        if (jobs[i] == nullptr) {
+            return i;
+        }
+    }
+    // NOTE: should never get here!
+    assert(false);
+    return MAX_JOBS;
+
+}
+
+

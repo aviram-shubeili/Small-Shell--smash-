@@ -5,6 +5,7 @@
 #include <vector>
 #include <sstream>
 #include <sys/wait.h>
+#include <time.h>
 #include <iomanip>
 #include "Commands.h"
 #include <climits>
