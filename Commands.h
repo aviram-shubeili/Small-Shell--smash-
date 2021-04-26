@@ -131,10 +131,6 @@ class JobsList {
         std::shared_ptr<Command> cmd;
         time_t time_executed;
         bool is_stopped;
-    public:
-
-
-    private:
         pid_t job_pid;
     public:
         JobEntry(std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped = false);
@@ -148,6 +144,7 @@ class JobsList {
     // TODO: Add your data members
 private:
     std::vector<std::shared_ptr<JobEntry>> jobs;
+    std::shared_ptr<JobEntry> ForeGroundJob;
     int getMinFreeID();
 //    std::vector<int> to_clear;
 public:
@@ -163,6 +160,8 @@ public:
 //    std::shared_ptr<JobEntry> getLastJob(int* lastJobId); // TODO : do we need this?
     std::shared_ptr<JobEntry> getLastStoppedJob(int *jobId);
     // TODO: Add extra methods or modify existing ones as needed
+    void setForeGroundJob(std::shared_ptr<Command> fg_cmd);
+    const std::shared_ptr<JobEntry> &getForeGroundJob() const;
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -210,6 +209,7 @@ private:
     std::string prompt_line;
     std::string last_working_directory;
     pid_t running_cmd;
+    JobsList jobs;
     SmallShell();
 public:
     const std::string &getPromptLine() const;

@@ -13,6 +13,7 @@ void ctrlZHandler(int sig_num) {
         kill(smash.getRunningCmd(),SIGSTOP);
         cout << "smash: process " << smash.getRunningCmd() << " was stopped\n";
         smash.setRunningCmd(NO_RUNNING_CMD);
+        //TODO: update jobs list?
     }
 }
 
@@ -25,7 +26,7 @@ void ctrlCHandler(int sig_num) {
         cout << "smash: process " << smash.getRunningCmd() << " was killed\n";
         smash.setRunningCmd(NO_RUNNING_CMD);
     }
-
+        //TODO: update jobs list?
 }
 
 void alarmHandler(int sig_num) {
@@ -35,5 +36,7 @@ void alarmHandler(int sig_num) {
     // todo check who sent the alaram????
     kill(alarm_sender,SIGKILL);
     cout << "smash" << "" << "timed out!" << endl;
+        //TODO: update jobs list?
+
 }
 

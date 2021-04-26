@@ -169,12 +169,16 @@ void SmallShell::executeCommand(const char *cmd_line) {
         }
         else{
             // father code
-            running_cmd = p;
             // updating son's pid
             cmd->setCmdPid(p);
+            // running_cmd = p; // TODO  maybe do this as well??
             if(not (dynamic_cast<ExternalCommand*>(cmd.get())->is_bg_cmd)) {
-                // if its a foreground command than wait for it to end/stop
+                // if its a foreground command:
+                jobs.setForeGroundJob(cmd);
                 waitpid(running_cmd,nullptr, WUNTRACED);
+            }
+            else {
+                jobs.addJob(cmd);
             }
         }
     }
@@ -415,6 +419,14 @@ int JobsList::getMinFreeID() {
     assert(false);
     return MAX_JOBS;
 
+}
+
+void JobsList::setForeGroundJob(std::shared_ptr<Command> fg_cmd) {
+    ForeGroundJob = std::make_shared<JobEntry>(fg_cmd, fg_cmd->getCmdPid());
+}
+
+const shared_ptr<JobsList::JobEntry> &JobsList::getForeGroundJob() const {
+    return ForeGroundJob;
 }
 
 
