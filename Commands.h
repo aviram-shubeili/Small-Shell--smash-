@@ -162,12 +162,17 @@ public:
     // TODO: Add extra methods or modify existing ones as needed
     void setForeGroundJob(std::shared_ptr<Command> fg_cmd);
     const std::shared_ptr<JobEntry> &getForeGroundJob() const;
+    void moveFGToBG();
+    void StopFG();
+    void MarkStopped(int job_id);
+    void MarkCont(int job_id);
+    friend class SmallShell;
 };
 
 class JobsCommand : public BuiltInCommand {
-    // TODO: Add your data members
+JobsList* jobs;
 public:
-    JobsCommand(const char *cmd_line, JobsList* jobs)  : BuiltInCommand(cmd_line) {}
+    JobsCommand(const char *cmd_line, JobsList* jobs);
     virtual ~JobsCommand() {}
     void execute() override;
 };
@@ -209,9 +214,9 @@ private:
     std::string prompt_line;
     std::string last_working_directory;
     pid_t running_cmd;
-    JobsList jobs;
     SmallShell();
 public:
+    JobsList jobs;
     const std::string &getPromptLine() const;
     pid_t getRunningCmd() const;
     std::shared_ptr<Command> CreateCommand(const char* cmd_line);

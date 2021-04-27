@@ -98,22 +98,22 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
     if (firstWord.compare("pwd") == 0){
-        return std::shared_ptr<Command>(new GetCurrDirCommand(cmd_line));
+        return std::shared_ptr<Command>(new GetCurrDirCommand(cmd_s.c_str()));
     }
     else if (firstWord.compare("showpid") == 0){
-        return std::shared_ptr<Command>(new ShowPidCommand(cmd_line));
+        return std::shared_ptr<Command>(new ShowPidCommand(cmd_s.c_str()));
     }
     else if (firstWord.compare("chprompt")==0){
-        return std::shared_ptr<Command>(new ChangePromptCommand(cmd_line, &prompt_line));
+        return std::shared_ptr<Command>(new ChangePromptCommand(cmd_s.c_str(), &prompt_line));
     }
     else if (firstWord.compare("cd")==0){
-        return std::shared_ptr<Command>(new ChangeDirCommand(cmd_line, &last_working_directory)); // TODO fix
+        return std::shared_ptr<Command>(new ChangeDirCommand(cmd_s.c_str(), &last_working_directory)); // TODO fix
     }
     else if (firstWord.compare("jobs")==0){
-        return std::shared_ptr<Command>(new JobsCommand(cmd_line,&jobs));
+        return std::shared_ptr<Command>(new JobsCommand(cmd_s.c_str(),&jobs));
     }
     else {
-        return std::shared_ptr<Command>(new ExternalCommand(cmd_line));
+        return std::shared_ptr<Command>(new ExternalCommand(cmd_s.c_str()));
     }
 /*
     else if (firstWord.compare("kill")==0){
@@ -422,11 +422,47 @@ int JobsList::getMinFreeID() {
 }
 
 void JobsList::setForeGroundJob(std::shared_ptr<Command> fg_cmd) {
-    ForeGroundJob = std::make_shared<JobEntry>(fg_cmd, fg_cmd->getCmdPid());
+    if(fg_cmd == nullptr) {
+        ForeGroundJob = nullptr;
+    }
+    else {
+        ForeGroundJob = std::make_shared<JobEntry>(fg_cmd, fg_cmd->getCmdPid());
+    }
 }
 
 const shared_ptr<JobsList::JobEntry> &JobsList::getForeGroundJob() const {
     return ForeGroundJob;
 }
+void JobsList::moveFGToBG() {
+    jobs[getMinFreeID()] = ForeGroundJob;
+    ForeGroundJob = nullptr;
+}
+
+void JobsList::MarkStopped(int job_id) {
+    if( 0 < job_id and job_id < MAX_JOBS and jobs[job_id]) {
+        jobs[job_id]->setIsStopped(true);
+    }
+}
 
 
+void JobsList::MarkCont(int job_id) {
+    if( 0 < job_id and job_id < MAX_JOBS and jobs[job_id]) {
+        jobs[job_id]->setIsStopped(false);
+    }
+}
+
+void JobsList::StopFG() {
+    ForeGroundJob->setIsStopped(true);
+    jobs[getMinFreeID()] = ForeGroundJob;
+    ForeGroundJob = nullptr;
+}
+
+
+void JobsCommand::execute() {
+
+}
+
+JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),
+                                                                 jobs(jobs) {
+    jobs->printJobsList();
+}
