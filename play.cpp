@@ -1,6 +1,6 @@
 
 #include <unistd.h>
-#include <string.h>
+#include <string>
 #include <iostream>
 #include <vector>
 #include <sstream>
@@ -10,10 +10,31 @@
 #include "Commands.h"
 #include <climits>
 #include <wait.h>
-using namespace std;
+#include <algorithm>
 
+using namespace std;
+bool isNumber(const std::string& s)
+{
+    return !s.empty() &&
+           std::find_if(s.begin(),
+                        s.end(), [](unsigned char c) { return !std::isdigit(c); }) == s.end();
+}
 
 int main() {
+
+    std::string str = "-3";
+    bool isNum = isNumber(str);
+    if(isNum) {
+        int num = stoi(str);
+    cout << isNum << endl << num << endl;
+    }
+
+
+    for(int i = 0 ; i < 30 ; i++) {
+        std::cout << i << endl;
+        sleep(1);
+    }
+                  int status;
     int* num = new int;
     *num = 1;
     pid_t p = fork();
@@ -24,7 +45,8 @@ int main() {
         delete num;
     }
     else {
-        wait(nullptr);
+        sleep(5);
+        kill(p,SIGCONT);
         cout << "father num is at:  " << num << endl;
         cout << "num is " << *num << endl;
         delete num;

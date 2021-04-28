@@ -16,7 +16,8 @@
 #define COMMAND_MAX_ARGS (30)
 #define PATH_ARG 1
 #define MAX_JOBS (101)
-
+#define KILL_CMD_ARG_NUM 3
+#define NO_RUNNING_CMD 0
 const std::string WHITESPACE = " \n\r\t\f\v";
 int _parseCommandLine(const char* cmd_line, char** args);
 
@@ -132,8 +133,9 @@ class JobsList {
         time_t time_executed;
         bool is_stopped;
         pid_t job_pid;
+        int job_id;
     public:
-        JobEntry(std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped = false);
+        JobEntry(std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped = false, int id= 0);
         ~JobEntry() = default;
         std::shared_ptr<Command> getCommand() { return cmd; }
         time_t getTime() const { return time_executed; }
@@ -144,7 +146,7 @@ class JobsList {
     // TODO: Add your data members
 private:
     std::vector<std::shared_ptr<JobEntry>> jobs;
-    std::shared_ptr<JobEntry> ForeGroundJob;
+    std::shared_ptr<JobEntry> fg_job;
     int getMinFreeID();
 //    std::vector<int> to_clear;
 public:
@@ -155,18 +157,23 @@ public:
     void killAllJobs();
     void removeFinishedJobs();
     std::shared_ptr<JobEntry> getJobById(int jobId);
+    pid_t getPIDByJobId(int jobId);
     // TODO: getByPID?
     void removeJobById(int jobId);
-//    std::shared_ptr<JobEntry> getLastJob(int* lastJobId); // TODO : do we need this?
+    int getLastJob(int* lastJobId);
     std::shared_ptr<JobEntry> getLastStoppedJob(int *jobId);
     // TODO: Add extra methods or modify existing ones as needed
+
     void setForeGroundJob(std::shared_ptr<Command> fg_cmd);
     const std::shared_ptr<JobEntry> &getForeGroundJob() const;
     void moveFGToBG();
+    void moveBGToFG(int job_id); // todo: implement this!
     void StopFG();
     void MarkStopped(int job_id);
     void MarkCont(int job_id);
+    bool isExists(int job_id);
     friend class SmallShell;
+
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -178,6 +185,10 @@ public:
 };
 
 class KillCommand : public BuiltInCommand {
+    JobsList* jobs;
+    int signal;
+    int job_id;
+    bool getArguments();
     // TODO: Add your data members
 public:
     KillCommand(const char* cmd_line, JobsList* jobs);
@@ -186,7 +197,10 @@ public:
 };
 
 class ForegroundCommand : public BuiltInCommand {
+    JobsList* jobs;
+    int job_id;
     // TODO: Add your data members
+    bool getArguments();
 public:
     ForegroundCommand(const char* cmd_line, JobsList* jobs);
     virtual ~ForegroundCommand() {}
@@ -213,7 +227,7 @@ class SmallShell {
 private:
     std::string prompt_line;
     std::string last_working_directory;
-    pid_t running_cmd;
+//    pid_t running_cmd;
     SmallShell();
 public:
     JobsList jobs;
@@ -231,7 +245,7 @@ public:
     ~SmallShell();
     void executeCommand(const char* cmd_line);
 
-    void setRunningCmd(pid_t runningCmd);
+
     // TODO: add extra methods as needed
 };
 

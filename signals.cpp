@@ -10,11 +10,15 @@ void ctrlZHandler(int sig_num) {
     SmallShell& smash = SmallShell::getInstance();
     // checks if there is an external command running in the fg:
     if(smash.getRunningCmd() != NO_RUNNING_CMD) {
-        kill(smash.getRunningCmd(),SIGSTOP);
+
+        if(kill(smash.getRunningCmd(),SIGSTOP) == -1) {
+            perror("smash error: kill failed");
+        }
+
         cout << "smash: process " << smash.getRunningCmd() << " was stopped\n";
-        smash.setRunningCmd(NO_RUNNING_CMD);
         smash.jobs.StopFG();
     }
+    smash.jobs.setForeGroundJob(nullptr);
 }
 
 void ctrlCHandler(int sig_num) {
@@ -22,11 +26,12 @@ void ctrlCHandler(int sig_num) {
     SmallShell& smash = SmallShell::getInstance();
     // checks if there is an external command running:
     if(smash.getRunningCmd() != NO_RUNNING_CMD) {
-        kill(smash.getRunningCmd(),SIGKILL);
+        if (kill(smash.getRunningCmd(),SIGKILL) == -1) {
+            perror("smash error: kill failed");
+        }
         cout << "smash: process " << smash.getRunningCmd() << " was killed\n";
-        smash.setRunningCmd(NO_RUNNING_CMD);
     }
-        smash.jobs.setForeGroundJob(nullptr);
+    smash.jobs.setForeGroundJob(nullptr);
 }
 
 void alarmHandler(int sig_num) {
@@ -34,9 +39,11 @@ void alarmHandler(int sig_num) {
 //    SmallShell& smash = SmallShell::getInstance();
     pid_t alarm_sender = 1;     // todo change this!
     // todo check who sent the alaram????
-    kill(alarm_sender,SIGKILL);
+    if( kill(alarm_sender,SIGKILL) == -1) {
+        perror("smash error: kill failed");
+    }
     cout << "smash" << "" << "timed out!" << endl;
-        //TODO: update jobs list?
+    //TODO: update jobs list?
 
 }
 

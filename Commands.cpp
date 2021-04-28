@@ -9,6 +9,8 @@
 #include "Commands.h"
 #include <climits>
 #include <assert.h>
+#include <algorithm>
+
 using namespace std;
 
 #if 0
@@ -78,6 +80,13 @@ void _removeBackgroundSign(string& cmd_line) {
     cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
+bool isNumber(const std::string& s)
+{
+    return !s.empty() &&
+           std::find_if(s.begin(),
+                        s.end(), [](unsigned char c) { return !std::isdigit(c); }) == s.end();
+}
+
 // TODO: Add your implementation for classes in Commands.h 
 
 SmallShell::SmallShell() : prompt_line("smash")
@@ -112,16 +121,16 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWord.compare("jobs")==0){
         return std::shared_ptr<Command>(new JobsCommand(cmd_s.c_str(),&jobs));
     }
+    else if (firstWord.compare("kill")==0){
+        return std::shared_ptr<Command>(new KillCommand(cmd_s.c_str(), &jobs));
+    }
+    else if (firstWord.compare("fg")==0){
+        return std::shared_ptr<Command>(new ForegroundCommand(cmd_s.c_str(), &jobs));
+    }
     else {
         return std::shared_ptr<Command>(new ExternalCommand(cmd_s.c_str()));
     }
 /*
-    else if (firstWord.compare("kill")==0){
-        return new KillCommand(cmd_line); // external
-    }
-    else if (firstWord.compare("fg")==0){
-        return new ForegroundCommand(cmd_line); // external
-    }
     else if (firstWord.compare("bg")==0){
         return new BackgroundCommand(cmd_line); // external
     }
@@ -171,11 +180,11 @@ void SmallShell::executeCommand(const char *cmd_line) {
             // father code
             // updating son's pid
             cmd->setCmdPid(p);
-            // running_cmd = p; // TODO  maybe do this as well??
             if(not (dynamic_cast<ExternalCommand*>(cmd.get())->is_bg_cmd)) {
                 // if its a foreground command:
                 jobs.setForeGroundJob(cmd);
-                waitpid(running_cmd,nullptr, WUNTRACED);
+//                running_cmd = p; // TODO  maybe do this as well??
+                waitpid(jobs.getForeGroundJob()->getJobPid(),nullptr, WUNTRACED);
             }
             else {
                 jobs.addJob(cmd);
@@ -199,12 +208,12 @@ const string &SmallShell::getPromptLine() const {
 }
 
 pid_t SmallShell::getRunningCmd() const {
-    return running_cmd;
+    if(jobs.getForeGroundJob()) {
+        return jobs.getForeGroundJob()->getJobPid();
+    }
+    return NO_RUNNING_CMD;
 }
 
-void SmallShell::setRunningCmd(pid_t runningCmd) {
-    running_cmd = runningCmd;
-}
 
 
 //==================================== Commands ======================================//
@@ -331,9 +340,10 @@ ostream &operator<<(ostream &os, const Command &command) {
 //==============Job Entry==========//
 
 JobsList::JobEntry::JobEntry
-        (std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped) : cmd(cmd),
-                                                                    is_stopped(is_stopped),
-                                                                    job_pid(p)
+        (std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped, int id) : cmd(cmd),
+                                                                            is_stopped(is_stopped),
+                                                                            job_pid(p),
+                                                                            job_id(id)
 {
     // update  executed time
     time(&time_executed);
@@ -346,7 +356,8 @@ void JobsList::JobEntry::setIsStopped(bool isStopped) {
 JobsList::JobsList() : jobs(MAX_JOBS) {}
 
 void JobsList::addJob(std::shared_ptr<Command> cmd, bool isStopped){
-    jobs[getMinFreeID()] = std::make_shared<JobEntry>(cmd, cmd->getCmdPid());
+    int job_id = getMinFreeID();
+    jobs[job_id] = std::make_shared<JobEntry>(cmd, cmd->getCmdPid(),false, job_id);
 }
 
 void JobsList::printJobsList(){
@@ -368,7 +379,9 @@ void JobsList::printJobsList(){
 void JobsList::killAllJobs(){
     for (int i=0; i<MAX_JOBS; i++){
         if (jobs[i]){
-            kill(jobs[i]->getJobPid(),SIGKILL);
+            if(kill(jobs[i]->getJobPid(),SIGKILL) == -1) {
+                perror("smash error: kill failed");
+            }
             jobs[i] = nullptr;
         }
     }
@@ -378,7 +391,7 @@ void JobsList::removeFinishedJobs(){
     for (int i=0; i<MAX_JOBS; i++){
         if (jobs[i]){
             int status;
-            waitpid(jobs[i]->getJobPid(), &status, WNOHANG);
+            status = waitpid(jobs[i]->getJobPid(), nullptr, WNOHANG);
             // if status == pid <--> process exited (finished)
             if(status == jobs[i]->getJobPid()) {
                 jobs[i] = nullptr;
@@ -423,19 +436,19 @@ int JobsList::getMinFreeID() {
 
 void JobsList::setForeGroundJob(std::shared_ptr<Command> fg_cmd) {
     if(fg_cmd == nullptr) {
-        ForeGroundJob = nullptr;
+        fg_job = nullptr;
     }
     else {
-        ForeGroundJob = std::make_shared<JobEntry>(fg_cmd, fg_cmd->getCmdPid());
+        fg_job = std::make_shared<JobEntry>(fg_cmd, fg_cmd->getCmdPid());
     }
 }
 
 const shared_ptr<JobsList::JobEntry> &JobsList::getForeGroundJob() const {
-    return ForeGroundJob;
+    return fg_job;
 }
 void JobsList::moveFGToBG() {
-    jobs[getMinFreeID()] = ForeGroundJob;
-    ForeGroundJob = nullptr;
+    jobs[getMinFreeID()] = fg_job;
+    fg_job = nullptr;
 }
 
 void JobsList::MarkStopped(int job_id) {
@@ -452,17 +465,139 @@ void JobsList::MarkCont(int job_id) {
 }
 
 void JobsList::StopFG() {
-    ForeGroundJob->setIsStopped(true);
-    jobs[getMinFreeID()] = ForeGroundJob;
-    ForeGroundJob = nullptr;
+    if(fg_job) {
+        fg_job->setIsStopped(true);
+        jobs[getMinFreeID()] = fg_job;
+        fg_job = nullptr;
+    }
 }
 
-
-void JobsCommand::execute() {
-
+bool JobsList::isExists(int job_id) {
+    return 0 < job_id and
+           job_id < MAX_JOBS and
+           jobs[job_id] != nullptr;
 }
+
+pid_t JobsList::getPIDByJobId(int jobId) {
+    if(not isExists(jobId)) {
+        return 0;
+    }
+    return jobs[jobId]->getJobPid();
+}
+
+int JobsList::getLastJob(int *lastJobId) {
+    for(int i = MAX_JOBS-1 ; i > 0 ; i--) {
+        if(jobs[i]) {
+            *lastJobId = i;
+            return i;
+        }
+    }
+    // if list is empty - return -1 to indicate.
+    *lastJobId = -1;
+    return -1;
+}
+
+void JobsList::moveBGToFG(int job_id) {
+    if (not isExists(job_id)) {
+        return;
+    }
+    // update FGJob and remove from list
+    fg_job = jobs[job_id];
+    jobs[job_id] = nullptr;
+    std::cout << *(fg_job->getCommand()) << " : ";
+    std::cout << fg_job->getJobPid() << " " << endl;
+    // TODO does sending SIGCONT to a finished process could fail?
+    kill(fg_job->getJobPid(), SIGCONT);
+    // wait for the process to finish (or to be stopped by ctrl + z)
+    waitpid(fg_job->getJobPid(), nullptr, WUNTRACED);
+}
+
 
 JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),
                                                                  jobs(jobs) {
+}
+void JobsCommand::execute() {
     jobs->printJobsList();
+
+}
+
+KillCommand::KillCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),
+                                                                 jobs(jobs){
+
+}
+bool KillCommand::getArguments() {
+    if(num_arg != KILL_CMD_ARG_NUM) {
+        return false;
+    }
+    std::string signal_str = arguments[1];
+    std::string job_str = arguments[2];
+    // check if signal starts with a -
+    if(signal_str[0] != '-') {
+        return false;
+    }
+    signal_str = signal_str.substr(1);
+    // check if the argument is a number
+    if(not isNumber(signal_str) or not isNumber(job_str)) {
+        return false;
+    }
+    // convert strings to int
+    signal = stoi(signal_str);
+    job_id = stoi(job_str);
+    return true;
+}
+void KillCommand::execute() {
+    if(num_arg != KILL_CMD_ARG_NUM or not getArguments()) {
+        cerr << "smash error: kill: invalid arguments" << endl;
+        return;
+    }
+    if(not jobs->isExists(job_id)) {
+        cerr << "smash error: kill: job-id " << job_id <<  " does not exist" << endl;
+        return;
+    }
+    if(kill(jobs->getPIDByJobId(job_id),signal) == -1) {
+        perror("smash error: kill failed");
+    }
+
+}
+
+
+ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),
+                                                                             jobs(jobs) { }
+
+bool ForegroundCommand::getArguments() {
+    if( num_arg > 2) {
+        return false;
+    }
+    if( num_arg == 2 and not isNumber(arguments[1])) {
+        return false;
+    }
+    if( num_arg == 2 ) {
+        job_id = stoi(arguments[1]);
+    }
+    else {
+        job_id = jobs->getLastJob(&job_id);
+    }
+    return true;
+}
+
+void ForegroundCommand::execute() {
+    if(not getArguments()) {
+        cerr << "smash error: fg: invalid arguments" << endl;
+        return;
+    }
+    if(num_arg == 2) {
+        if( not jobs->isExists(job_id)) {
+            cerr << "smash error: fg: " << job_id << " does not exist" << endl;
+            return;
+        }
+    }
+    else {
+        // arg_num == 1
+        if(job_id == -1) {
+            // getLastJob return -1 --> jobs list is empty
+            cerr << "smash error: fg: jobs list is empty" << endl;
+            return;
+        }
+    }
+    jobs->moveBGToFG(job_id);
 }
