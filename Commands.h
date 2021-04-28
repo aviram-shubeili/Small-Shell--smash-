@@ -18,6 +18,10 @@
 #define MAX_JOBS (101)
 #define KILL_CMD_ARG_NUM 3
 #define NO_RUNNING_CMD 0
+enum SmashOperation {
+    QUIT = 0,
+    CONTINUE
+};
 const std::string WHITESPACE = " \n\r\t\f\v";
 int _parseCommandLine(const char* cmd_line, char** args);
 
@@ -117,7 +121,9 @@ public:
 
 class JobsList;
 class QuitCommand : public BuiltInCommand {
+    JobsList* jobs;
 // TODO: Add your data members public:
+public:
     QuitCommand(const char* cmd_line, JobsList* jobs);
     virtual ~QuitCommand() {}
     void execute() override;
@@ -139,6 +145,7 @@ class JobsList {
         ~JobEntry() = default;
         std::shared_ptr<Command> getCommand() { return cmd; }
         time_t getTime() const { return time_executed; }
+        void resetTime();
         bool isStopped() const { return is_stopped; }
         pid_t getJobPid() const { return  job_pid; }
         void setIsStopped(bool isStopped);
@@ -160,18 +167,19 @@ public:
     pid_t getPIDByJobId(int jobId);
     // TODO: getByPID?
     void removeJobById(int jobId);
-    int getLastJob(int* lastJobId);
+    int getLastJobId(int* lastJobId);
     std::shared_ptr<JobEntry> getLastStoppedJob(int *jobId);
     // TODO: Add extra methods or modify existing ones as needed
 
     void setForeGroundJob(std::shared_ptr<Command> fg_cmd);
     const std::shared_ptr<JobEntry> &getForeGroundJob() const;
-    void moveFGToBG();
     void moveBGToFG(int job_id); // todo: implement this!
     void StopFG();
     void MarkStopped(int job_id);
+    void ContinueJob(int job_id);
     void MarkCont(int job_id);
     bool isExists(int job_id);
+    bool isStopped(int job_id);
     friend class SmallShell;
 
 };
@@ -208,7 +216,9 @@ public:
 };
 
 class BackgroundCommand : public BuiltInCommand {
-    // TODO: Add your data members
+    JobsList* jobs;
+    int job_id;
+    bool getArguments();
 public:
     BackgroundCommand(const char* cmd_line, JobsList* jobs);
     virtual ~BackgroundCommand() {}
@@ -243,7 +253,7 @@ public:
         return instance;
     }
     ~SmallShell();
-    void executeCommand(const char* cmd_line);
+    SmashOperation executeCommand(const char* cmd_line);
 
 
     // TODO: add extra methods as needed

@@ -127,40 +127,19 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWord.compare("fg")==0){
         return std::shared_ptr<Command>(new ForegroundCommand(cmd_s.c_str(), &jobs));
     }
+    else if (firstWord.compare("bg")==0){
+        return std::shared_ptr<Command>( new BackgroundCommand(cmd_s.c_str(), &jobs));
+    }
+    else if (firstWord.compare("quit")==0){
+        return std::shared_ptr<Command>(new QuitCommand(cmd_s.c_str(), &jobs));
+    }
     else {
         return std::shared_ptr<Command>(new ExternalCommand(cmd_s.c_str()));
     }
-/*
-    else if (firstWord.compare("bg")==0){
-        return new BackgroundCommand(cmd_line); // external
-    }
-    else if (firstWord.compare("quit")==0){
-        return new QuitCommand(cmd_line); // external
-    }
-     */
-
-    /*
-	// For example:
-
-  string cmd_s = _trim(string(cmd_line));
-  string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-
-  if (firstWord.compare("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
-  }
-  else if (firstWord.compare("showpid") == 0) {
-    return new ShowPidCommand(cmd_line);
-  }
-  else if ...
-  .....
-  else {
-    return new ExternalCommand(cmd_line);
-  }
-*/
     return nullptr;
 }
 
-void SmallShell::executeCommand(const char *cmd_line) {
+SmashOperation SmallShell::executeCommand(const char *cmd_line) {
     std::shared_ptr<Command> cmd = CreateCommand(cmd_line);
 
     // External commands special handling
@@ -195,12 +174,13 @@ void SmallShell::executeCommand(const char *cmd_line) {
         //if (cmd_line[0]=="") { // TODO handle forking external commands
         cmd->execute();
     }
-    //}
-    // TODO: Add your implementation here
-    // for example:
-    // Command* cmd = CreateCommand(cmd_line);
-    // cmd->execute();
-    // Please note that you must fork smash process for some commands (e.g., external commands....)
+
+    if (typeid(*cmd) == typeid(QuitCommand)) {
+        return QUIT;
+    }
+    else {
+        return CONTINUE;
+    }
 }
 
 const string &SmallShell::getPromptLine() const {
@@ -352,6 +332,10 @@ void JobsList::JobEntry::setIsStopped(bool isStopped) {
     is_stopped = isStopped;
 }
 
+void JobsList::JobEntry::resetTime() {
+    time(&time_executed);
+}
+
 
 JobsList::JobsList() : jobs(MAX_JOBS) {}
 
@@ -377,8 +361,17 @@ void JobsList::printJobsList(){
 }
 
 void JobsList::killAllJobs(){
-    for (int i=0; i<MAX_JOBS; i++){
+    removeFinishedJobs();
+    int jobs_count = 0;
+    for(int i = 1 ; i < MAX_JOBS ; i++) {
+        if(jobs[i]) {
+            jobs_count++;
+        }
+    }
+    cout << "smash: sending SIGKILL signal to " << jobs_count << " jobs:" << endl;
+    for (int i = 1; i<MAX_JOBS; i++){
         if (jobs[i]){
+            cout << jobs[i]->getJobPid() << ": " << *(jobs[i]->getCommand()) << endl;
             if(kill(jobs[i]->getJobPid(),SIGKILL) == -1) {
                 perror("smash error: kill failed");
             }
@@ -410,12 +403,13 @@ void JobsList::removeJobById(int jobId){
     }
 }
 
-//shared_ptr<JobEntry> JobsList::getLastJob(int* lastJobId){} // TODO last job that was done? or something else?
+//shared_ptr<JobEntry> JobsList::getLastJobId(int* lastJobId){} // TODO last job that was done? or something else?
 
 shared_ptr<JobsList::JobEntry> JobsList::getLastStoppedJob(int *jobId) {
     removeFinishedJobs();
     for (int i = MAX_JOBS - 1; i > 0; --i) {
         if (jobs[i] and jobs[i]->isStopped()) {
+            *jobId = i;
             return jobs[i];
         }
     }
@@ -446,10 +440,6 @@ void JobsList::setForeGroundJob(std::shared_ptr<Command> fg_cmd) {
 const shared_ptr<JobsList::JobEntry> &JobsList::getForeGroundJob() const {
     return fg_job;
 }
-void JobsList::moveFGToBG() {
-    jobs[getMinFreeID()] = fg_job;
-    fg_job = nullptr;
-}
 
 void JobsList::MarkStopped(int job_id) {
     if( 0 < job_id and job_id < MAX_JOBS and jobs[job_id]) {
@@ -467,6 +457,7 @@ void JobsList::MarkCont(int job_id) {
 void JobsList::StopFG() {
     if(fg_job) {
         fg_job->setIsStopped(true);
+        fg_job->resetTime();
         jobs[getMinFreeID()] = fg_job;
         fg_job = nullptr;
     }
@@ -485,7 +476,7 @@ pid_t JobsList::getPIDByJobId(int jobId) {
     return jobs[jobId]->getJobPid();
 }
 
-int JobsList::getLastJob(int *lastJobId) {
+int JobsList::getLastJobId(int *lastJobId) {
     for(int i = MAX_JOBS-1 ; i > 0 ; i--) {
         if(jobs[i]) {
             *lastJobId = i;
@@ -510,6 +501,23 @@ void JobsList::moveBGToFG(int job_id) {
     kill(fg_job->getJobPid(), SIGCONT);
     // wait for the process to finish (or to be stopped by ctrl + z)
     waitpid(fg_job->getJobPid(), nullptr, WUNTRACED);
+}
+
+bool JobsList::isStopped(int job_id) {
+    return isExists(job_id) and
+           jobs[job_id]->isStopped();
+}
+
+void JobsList::ContinueJob(int job_id) {
+    if(not isStopped(job_id)) {
+        return;
+    }
+    std::cout << *(jobs[job_id]->getCommand()) << " : ";
+    std::cout << jobs[job_id]->getJobPid() << " " << endl;
+    // TODO does sending SIGCONT to a finished process could fail?
+    MarkCont(job_id);
+    kill(jobs[job_id]->getJobPid(), SIGCONT);
+    // dont wait.
 }
 
 
@@ -575,7 +583,7 @@ bool ForegroundCommand::getArguments() {
         job_id = stoi(arguments[1]);
     }
     else {
-        job_id = jobs->getLastJob(&job_id);
+        job_id = jobs->getLastJobId(&job_id);
     }
     return true;
 }
@@ -594,10 +602,65 @@ void ForegroundCommand::execute() {
     else {
         // arg_num == 1
         if(job_id == -1) {
-            // getLastJob return -1 --> jobs list is empty
+            // getLastJobId return -1 --> jobs list is empty
             cerr << "smash error: fg: jobs list is empty" << endl;
             return;
         }
     }
     jobs->moveBGToFG(job_id);
+}
+
+BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),
+                                                                             jobs(jobs) { }
+
+bool BackgroundCommand::getArguments() {
+    if( num_arg > 2) {
+        return false;
+    }
+    if( num_arg == 2 and not isNumber(arguments[1])) {
+        return false;
+    }
+    if( num_arg == 2 ) {
+        job_id = stoi(arguments[1]);
+    }
+    else {
+       jobs->getLastStoppedJob(&job_id);
+    }
+    return true;
+}
+
+void BackgroundCommand::execute() {
+    if(not getArguments()) {
+        cerr << "smash error: bg: invalid arguments" << endl;
+        return;
+    }
+    if(num_arg == 2) {
+        if( not jobs->isExists(job_id)) {
+            cerr << "smash error: bg: " << job_id << " does not exist" << endl;
+            return;
+        }
+    }
+    else if(num_arg == 1) {
+        if(job_id == -1) {
+            // getLastJobId return -1 --> jobs list is empty
+            cerr << "smash error: bg: jobs list is empty" << endl;
+            return;
+        }
+    }
+    else if(not jobs->isStopped(job_id)) {
+        cerr << "smash error: bg: " << job_id << " is already running in the background" << endl;
+        return;
+    }
+
+    jobs->ContinueJob(job_id);
+
+}
+
+QuitCommand::QuitCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),
+                                                                 jobs(jobs) {}
+
+void QuitCommand::execute() {
+    if(num_arg >= 2 and strcmp(arguments[1],"kill") == 0) {
+        jobs->killAllJobs();
+    }
 }

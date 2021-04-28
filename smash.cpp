@@ -16,13 +16,12 @@ int main(int argc, char* argv[]) {
     //TODO: setup sig alarm handler
 
     SmallShell& smash = SmallShell::getInstance();
-    while(true) {
-        char* parsing[22];
+    SmashOperation quit_flag = CONTINUE;
+    while(quit_flag != QUIT) {
         std::cout << smash.getPromptLine() << "> ";
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
-        _parseCommandLine(cmd_line.c_str(), parsing);
-        smash.executeCommand(cmd_line.c_str());
+        quit_flag = smash.executeCommand(cmd_line.c_str());
 
         // TODO free the array?
     }
