@@ -116,7 +116,7 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
         return std::shared_ptr<Command>(new ChangePromptCommand(cmd_s.c_str(), &prompt_line));
     }
     else if (firstWord.compare("cd")==0){
-        return std::shared_ptr<Command>(new ChangeDirCommand(cmd_s.c_str(), &last_working_directory)); // TODO fix
+        return std::shared_ptr<Command>(new ChangeDirCommand(cmd_s.c_str(), &last_working_directory));
     }
     else if (firstWord.compare("jobs")==0){
         return std::shared_ptr<Command>(new JobsCommand(cmd_s.c_str(),&jobs));
@@ -133,10 +133,13 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWord.compare("quit")==0){
         return std::shared_ptr<Command>(new QuitCommand(cmd_s.c_str(), &jobs));
     }
+    else if (firstWord.compare("cat")==0){
+        return std::shared_ptr<Command>(new CatCommand(cmd_s.c_str()));
+    }
     else {
         return std::shared_ptr<Command>(new ExternalCommand(cmd_s.c_str()));
     }
-    return nullptr;
+
 }
 
 SmashOperation SmallShell::executeCommand(const char *cmd_line) {
@@ -624,7 +627,7 @@ bool BackgroundCommand::getArguments() {
         job_id = stoi(arguments[1]);
     }
     else {
-       jobs->getLastStoppedJob(&job_id);
+        jobs->getLastStoppedJob(&job_id);
     }
     return true;
 }
@@ -662,5 +665,38 @@ QuitCommand::QuitCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(
 void QuitCommand::execute() {
     if(num_arg >= 2 and strcmp(arguments[1],"kill") == 0) {
         jobs->killAllJobs();
+    }
+}
+
+CatCommand::CatCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
+
+void CatCommand::execute() {
+
+    if(num_arg == 1) {
+        cerr << "smash error: cat: not enough arguments" << endl;
+        return;
+    }
+
+    for(int i=1 ; i< num_arg ; i++) {
+        int fd = open(arguments[i], O_RDONLY);
+        if (fd == -1) {
+            perror("smash error: open failed");
+        } else {
+            ssize_t bytes_read_successfully;
+            char buffer[READING_ITERATION + 1];
+            do {
+                bytes_read_successfully = read(fd, buffer, READING_ITERATION);
+                if (bytes_read_successfully == -1) {
+                    perror("smash error: read failed");
+                } else {
+                    cout << buffer;
+                }
+
+            } while (bytes_read_successfully == READING_ITERATION);
+
+            if (close(fd) == -1) {
+                perror("smash error: close failed");
+            }
+        }
     }
 }

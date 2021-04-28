@@ -4,6 +4,9 @@
 #include <time.h>
 #include <memory>
 #include <ostream>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #define DO_SYS( syscall ) do { \
     if((syscall) == -1 ) { \
@@ -18,6 +21,7 @@
 #define MAX_JOBS (101)
 #define KILL_CMD_ARG_NUM 3
 #define NO_RUNNING_CMD 0
+#define READING_ITERATION 512
 enum SmashOperation {
     QUIT = 0,
     CONTINUE
@@ -227,7 +231,7 @@ public:
 
 class CatCommand : public BuiltInCommand {
 public:
-    CatCommand(const char* cmd_line);
+    explicit CatCommand(const char* cmd_line);
     virtual ~CatCommand() {}
     void execute() override;
 };
