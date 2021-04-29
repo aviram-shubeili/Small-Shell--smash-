@@ -8,10 +8,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define DO_SYS( syscall ) do { \
+#define DO_CLOSE( syscall ) do { \
     if((syscall) == -1 ) { \
-    perror( #syscall ); \
-    exit(1); \
+    perror( "smash: close failed" ); \
     } \
     } while( 0 ) \
 
@@ -22,8 +21,12 @@
 #define KILL_CMD_ARG_NUM 3
 #define NO_RUNNING_CMD 0
 #define READING_ITERATION 512
+#define STDERR_FD 2
 #define STDOUT_FD 1
 #define STDIN_FD 0
+#define PIPE_READ 0
+#define PIPE_WRITE 0
+
 enum SpecialCommand {
     NORMAL = 0,
     PIPE,
@@ -77,8 +80,13 @@ public:
     void execute() override;
 };
 
-class PipeCommand : public BuiltInCommand { // TODO is this supposed to inherit builtin?
+class PipeCommand : public Command { // TODO is this supposed to inherit builtin?
     SpecialCommand op;
+    std::string cmd1_s;
+    std::string cmd2_s;
+    int temp_stdout_fd;
+    int temp_stderr_fd;
+    int temp_stdin_fd;
     // TODO: Add your data members
 public:
     PipeCommand(const char *cmd_line, SpecialCommand op);

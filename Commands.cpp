@@ -742,29 +742,88 @@ void QuitCommand::execute() {
     }
 }
 
-PipeCommand::PipeCommand(const char *cmd_line, SpecialCommand op) : BuiltInCommand(cmd_line),
-                                                                    op(op){}
+PipeCommand::PipeCommand(const char *cmd_line, SpecialCommand op) : op(op) {
+    string temp(cmd_line);
+    size_t op_pos;
+    if(op == PIPE) {
+        op_pos = temp.find("|");
+        // skip | and space
+        cmd1_s = temp.substr(0, op_pos);
+        cmd2_s = temp.substr(op_pos + 2);
+    }
+        // PIPE_TO_ERR
+    else {
+        op_pos = temp.find("|&");
+        // skip |& and space
+        cmd1_s = temp.substr(0, op_pos);
+        cmd2_s = temp.substr(op_pos + 3);
+    }
+
+}
 
 void PipeCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
+
     int fd [2];
     if (pipe(fd) == -1){
-        //TODO Failure
+        perror("smash: pipe failed");
+        return;
     }
 
-    pid_t p = fork();
-    if (p == -1) {
+    pid_t p1 = fork();
+    if (p1 == -1) {
         // fork failed
         perror("smash: fork failed");
+        return;
     }
-    else if (p == 0){
-        close(fd[0]);
-
+    else if (p1 == 0){
+        //  son 1 code
+        if(op == PIPE) {
+            if(dup2(fd[PIPE_WRITE],STDOUT_FD) == -1) {
+                perror("smash: dup2 failed");
+                return;
+            }
+        }
+        else {
+            // op == PIPE_ERR
+            if(dup2(fd[PIPE_WRITE],STDERR_FD) == -1) {
+                perror("smash: dup2 failed");
+                return;
+            }
+        }
+        DO_CLOSE(close(fd[PIPE_READ]));
+        DO_CLOSE(close(fd[PIPE_WRITE]));
+        smash.executeCommand(cmd1_s.c_str());
+        smash.external_quit_flag = true;
     }
     else {
         //father code
+        pid_t p2 = fork();
+        if (p2 == -1) {
+            // fork failed
+            perror("smash: fork failed");
+            return;
+        }
+        else if (p2 == 0) {
+            //  son 2 code
+            if( dup2(fd[PIPE_READ],STDIN_FD) == -1) {
+                perror("smash: dup2 failed");
+                return;
+            }
+            DO_CLOSE(close(fd[PIPE_READ]));
+            DO_CLOSE(close(fd[PIPE_WRITE]));
+            smash.executeCommand(cmd2_s.c_str());
+            smash.external_quit_flag = true;
+        }
+        else {
+            DO_CLOSE(close(fd[PIPE_READ]));
+            DO_CLOSE(close(fd[PIPE_WRITE]));
+            waitpid(p1,nullptr, WUNTRACED);
+            waitpid(p2,nullptr, WUNTRACED);
+        }
     }
 }
+
 
 RedirectionCommand::RedirectionCommand(const char *cmd_line, SpecialCommand op) : op(op) {
     string temp(cmd_line);
@@ -781,6 +840,8 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line, SpecialCommand op) 
         file_path = temp.substr(op_pos + 2);
     }
     cmd_s = temp.substr(0,op_pos);
+    file_path = _trim(file_path);
+    cmd_s = _trim(cmd_s);
 }
 
 void RedirectionCommand::execute() {
@@ -793,33 +854,6 @@ void RedirectionCommand::execute() {
 
     smash.executeCommand(cmd_s.c_str());
     cleanup();
-//
-//    pid_t p = fork(); //TODO Piazza said don't fork. tut3 page43 does fork though (and uses execv). what to do? I think it's possible without forking, but how?
-//    if (p == -1) {
-//        // fork failed
-//        perror("smash: fork failed");
-//    }
-//    else if (p == 0){
-//        close(1);
-//        if (op == ">") {
-//            fd_num = open(this->arguments[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
-//        }
-//        if (op == ">>") {
-//            fd_num = open(this->arguments[2], O_APPEND | O_WRONLY | O_CREAT, 0666);
-//        }
-//        char* arguments[] = {this->arguments[0], NULL};
-//        execv(arguments[0], arguments);
-//        //write(fd_num, buffer, size); TODO how?
-//    }
-//    else{ // father code
-//        close(0);
-//        wait(NULL);
-//    }
-
-    //TODO this is not writing to the file properly. I assume we need to use write(...), but how to do this while executing the command?
-    //std::shared_ptr<Command> cmd_s = smash.CreateCommand(this->arguments[0]);
-    //cmd_s->execute();
-    //cout << getpid() << endl;
 }
 
 void RedirectionCommand::prepare()  {
@@ -839,7 +873,7 @@ void RedirectionCommand::prepare()  {
     if(dup2(fd_num,STDOUT_FD) == -1) {
 
         if(close(fd_num) == -1) {
-            perror("smash: fork failed");
+            perror("smash: close failed");
             fd_num = -1;
             return;
         }
