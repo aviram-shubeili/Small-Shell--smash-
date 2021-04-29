@@ -22,6 +22,15 @@
 #define KILL_CMD_ARG_NUM 3
 #define NO_RUNNING_CMD 0
 #define READING_ITERATION 512
+#define STDOUT_FD 1
+#define STDIN_FD 0
+enum SpecialCommand {
+    NORMAL = 0,
+    PIPE,
+    PIPE_TO_ERR,
+    REDIRECTION,
+    REDIRECTION_APPEND
+};
 enum SmashOperation {
     QUIT = 0,
     CONTINUE
@@ -42,8 +51,8 @@ public:
                                                  cmd_pid(0) {}
     virtual ~Command() {}
     virtual void execute() = 0;
-    //virtual void prepare();
-    //virtual void cleanup();
+    virtual void prepare() {}
+    virtual void cleanup() {}
     void setCmdPid(pid_t cmdPid);
     pid_t getCmdPid() const;
     // TODO: Add your extra methods if needed
@@ -69,21 +78,27 @@ public:
 };
 
 class PipeCommand : public BuiltInCommand { // TODO is this supposed to inherit builtin?
+    SpecialCommand op;
     // TODO: Add your data members
 public:
-    PipeCommand(const char* cmd_line);
+    PipeCommand(const char *cmd_line, SpecialCommand op);
     virtual ~PipeCommand() {}
     void execute() override;
 };
 
-class RedirectionCommand : public BuiltInCommand { // TODO is this supposed to inherit builtin?
+class RedirectionCommand : public Command { // TODO is this supposed to inherit builtin?
+    SpecialCommand op;
+    std::string cmd_s;
+    std::string file_path;
+    int temp_stdout_fd;
+    int fd_num;
     // TODO: Add your data members
 public:
-    explicit RedirectionCommand(const char* cmd_line);
+    explicit RedirectionCommand(const char *cmd_line, SpecialCommand op);
     virtual ~RedirectionCommand() {}
     void execute() override;
-    //void prepare() override;
-    //void cleanup() override;
+    void prepare() override;
+    void cleanup() override;
 };
 
 
@@ -244,6 +259,7 @@ private:
 //    pid_t running_cmd;
     SmallShell();
 public:
+    bool external_quit_flag;
     JobsList jobs;
     const std::string &getPromptLine() const;
     pid_t getRunningCmd() const;

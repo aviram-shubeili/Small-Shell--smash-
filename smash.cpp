@@ -22,8 +22,9 @@ int main(int argc, char* argv[]) {
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
         quit_flag = smash.executeCommand(cmd_line.c_str());
-
-        // TODO free the array?
+        if(smash.external_quit_flag) {
+            break;
+        }
     }
     return 0;
 }

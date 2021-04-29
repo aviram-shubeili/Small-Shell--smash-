@@ -56,6 +56,46 @@ int _parseCommandLine(const char* cmd_line, char** args) {
     FUNC_EXIT()
 }
 
+SpecialCommand _identifyAndSeperateSpecialSigns(const char* cmd_line, std::string& result) {
+    std::string cmd_s(cmd_line);
+    size_t sign_pos;
+    // search for ">>"
+    sign_pos = cmd_s.find(">>");
+    if(sign_pos != string::npos) {
+        result = cmd_s.substr(0,sign_pos);
+        result += " >> ";
+        result += cmd_s.substr(sign_pos + 2);
+        return REDIRECTION_APPEND;
+    }
+    // search for ">"
+    sign_pos = cmd_s.find(">");
+    if(sign_pos != string::npos) {
+        result = cmd_s.substr(0,sign_pos);
+        result += " > ";
+        result += cmd_s.substr(sign_pos + 1);
+        return REDIRECTION;
+    }
+    // search for "|&"
+    sign_pos = cmd_s.find("|&");
+    if(sign_pos != string::npos) {
+        result = cmd_s.substr(0,sign_pos);
+        result += " |& ";
+        result += cmd_s.substr(sign_pos + 2);
+        return PIPE_TO_ERR;
+    }
+    // search for "|"
+    sign_pos = cmd_s.find("|");
+    if(sign_pos != string::npos) {
+        result = cmd_s.substr(0,sign_pos);
+        result += " | ";
+        result += cmd_s.substr(sign_pos + 1);
+        return PIPE;
+    }
+    // no special signs
+    result = cmd_s;
+    return NORMAL;
+}
+
 bool _isBackgroundCommand(const char* cmd_line) {
     const string str(cmd_line);
     size_t idx = str.find_last_not_of(WHITESPACE);
@@ -89,7 +129,7 @@ bool isNumber(const std::string& s)
 
 // TODO: Add your implementation for classes in Commands.h 
 
-SmallShell::SmallShell() : prompt_line("smash")
+SmallShell::SmallShell() : prompt_line("smash"), external_quit_flag(false)
 {
 // TODO: add your implementation
 }
@@ -99,26 +139,44 @@ SmallShell::~SmallShell() {
 }
 
 /**
-* Creates and returns a pointer to Command class which matches the given command line (cmd_line)
+* Creates and returns a pointer to Command class which matches the given command line (cmd_s)
 */
 std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
 
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-    for (int i=0; i<cmd_s.length(); i++){ // TODO better parsing? maybe splice with <, <<, |&, |?
-        if (cmd_s[i] == '|'){
-            if ((i+1 < cmd_s.length()) and (cmd_s[i+1] == '&')){ // TODO consider if we want to split between the ops here or later
-                return std::shared_ptr<Command>(new PipeCommand(cmd_line));
-            }
-            else { return std::shared_ptr<Command>(new PipeCommand(cmd_line)); } // op = '|'
-        }
-        else if (cmd_s[i] == '>'){
-            if ((i+1 < cmd_s.length()) and (cmd_s[i+1] == '>')){
-                return std::shared_ptr<Command>(new RedirectionCommand(cmd_line));
-            }
-            else { return std::shared_ptr<Command>(new RedirectionCommand(cmd_line)); }
-        }
+//    for (int i=0; i<cmd_s.length(); i++){ // TODO better parsing? maybe splice with <, <<, |&, |?
+//        if (cmd_s[i] == '|'){
+//            if ((i+1 < cmd_s.length()) and (cmd_s[i+1] == '&')){ // TODO consider if we want to split between the ops here or later
+//                return std::shared_ptr<Command>(new PipeCommand(cmd_s, PIPE_TO_ERR));
+//            }
+//            else { return std::shared_ptr<Command>(new PipeCommand(cmd_s, PIPE_TO_ERR)); } // op = '|'
+//        }
+//        else if (cmd_s[i] == '>'){
+//            if ((i+1 < cmd_s.length()) and (cmd_s[i+1] == '>')){
+//                return std::shared_ptr<Command>(new RedirectionCommand(cmd_s, PIPE_TO_ERR));
+//            }
+//            else { return std::shared_ptr<Command>(new RedirectionCommand(cmd_s, PIPE_TO_ERR)); }
+//        }
+//    }
+    string special_cmd;
+    switch (_identifyAndSeperateSpecialSigns(cmd_s.c_str(),special_cmd)) {
+        case PIPE:
+            return std::shared_ptr<Command>(new PipeCommand(special_cmd.c_str(), PIPE));
+            break;
+        case PIPE_TO_ERR:
+            return std::shared_ptr<Command>(new PipeCommand(special_cmd.c_str(), PIPE_TO_ERR));
+            break;
+        case REDIRECTION:
+            return std::shared_ptr<Command>(new RedirectionCommand(special_cmd.c_str(), REDIRECTION));
+            break;
+        case REDIRECTION_APPEND:
+            return std::shared_ptr<Command>(new RedirectionCommand(special_cmd.c_str(), REDIRECTION_APPEND));
+            break;
+        case NORMAL:
+            // not a special command --> move on
+            break;
     }
 
     if (firstWord.compare("pwd") == 0){
@@ -146,12 +204,12 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
         return std::shared_ptr<Command>( new BackgroundCommand(cmd_s.c_str(), &jobs));
     }
     else if (firstWord.compare("quit")==0){
+        external_quit_flag = true;
         return std::shared_ptr<Command>(new QuitCommand(cmd_s.c_str(), &jobs));
     }
     else if (firstWord.compare("cat")==0){
         return std::shared_ptr<Command>(new CatCommand(cmd_s.c_str()));
     }
-    //else if (firstWord.compare(""))
     else {
         return std::shared_ptr<Command>(new ExternalCommand(cmd_s.c_str()));
     }
@@ -190,7 +248,7 @@ SmashOperation SmallShell::executeCommand(const char *cmd_line) {
         }
     }
     else {
-        //if (cmd_line[0]=="") { // TODO handle forking external commands
+        //if (cmd_s[0]=="") { // TODO handle forking external commands
         cmd->execute();
     }
 
@@ -684,7 +742,8 @@ void QuitCommand::execute() {
     }
 }
 
-PipeCommand::PipeCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
+PipeCommand::PipeCommand(const char *cmd_line, SpecialCommand op) : BuiltInCommand(cmd_line),
+                                                                    op(op){}
 
 void PipeCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
@@ -707,41 +766,98 @@ void PipeCommand::execute() {
     }
 }
 
-RedirectionCommand::RedirectionCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
+RedirectionCommand::RedirectionCommand(const char *cmd_line, SpecialCommand op) : op(op) {
+    string temp(cmd_line);
+    size_t op_pos;
+    if(op == REDIRECTION_APPEND) {
+        op_pos = temp.find(">>");
+        // skip >> and space
+        file_path = temp.substr(op_pos + 3);
+    }
+        // REDIRECTION
+    else {
+        op_pos = temp.find(">");
+        // skip > and space
+        file_path = temp.substr(op_pos + 2);
+    }
+    cmd_s = temp.substr(0,op_pos);
+}
 
 void RedirectionCommand::execute() {
     SmallShell &smash = SmallShell::getInstance();
-    string op = this->arguments[1]; // ">" or ">>". TODO: can this be someplace other than arguments[1]? if so, loop?
 
-    int fd_num;
+    prepare();
+    if(fd_num == -1) {
+        return;
+    }
 
-
-    pid_t p = fork(); //TODO Piazza said don't fork. tut3 page43 does fork though (and uses execv). what to do? I think it's possible without forking, but how?
-    if (p == -1) {
-        // fork failed
-        perror("smash: fork failed");
-    }
-    else if (p == 0){
-        close(1);
-        if (op == ">") {
-            fd_num = open(this->arguments[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
-        }
-        if (op == ">>") {
-            fd_num = open(this->arguments[2], O_APPEND | O_WRONLY | O_CREAT, 0666);
-        }
-        char* arguments[] = {this->arguments[0], NULL};
-        execv(arguments[0], arguments);
-        //write(fd_num, buffer, size); TODO how?
-    }
-    else{ // father code
-        close(0);
-        wait(NULL);
-    }
+    smash.executeCommand(cmd_s.c_str());
+    cleanup();
+//
+//    pid_t p = fork(); //TODO Piazza said don't fork. tut3 page43 does fork though (and uses execv). what to do? I think it's possible without forking, but how?
+//    if (p == -1) {
+//        // fork failed
+//        perror("smash: fork failed");
+//    }
+//    else if (p == 0){
+//        close(1);
+//        if (op == ">") {
+//            fd_num = open(this->arguments[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+//        }
+//        if (op == ">>") {
+//            fd_num = open(this->arguments[2], O_APPEND | O_WRONLY | O_CREAT, 0666);
+//        }
+//        char* arguments[] = {this->arguments[0], NULL};
+//        execv(arguments[0], arguments);
+//        //write(fd_num, buffer, size); TODO how?
+//    }
+//    else{ // father code
+//        close(0);
+//        wait(NULL);
+//    }
 
     //TODO this is not writing to the file properly. I assume we need to use write(...), but how to do this while executing the command?
-    //std::shared_ptr<Command> cmd = smash.CreateCommand(this->arguments[0]);
-    //cmd->execute();
+    //std::shared_ptr<Command> cmd_s = smash.CreateCommand(this->arguments[0]);
+    //cmd_s->execute();
     //cout << getpid() << endl;
+}
+
+void RedirectionCommand::prepare()  {
+
+    temp_stdout_fd = dup(STDOUT_FD);
+    if(temp_stdout_fd == -1) {
+        perror("smash: dup failed");
+        return;
+    }
+    fd_num = (op == REDIRECTION_APPEND) ?
+             open(file_path.c_str(),  O_APPEND | O_WRONLY | O_CREAT, 0666) :
+             open(file_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if(fd_num == -1) {
+        perror("smash: open failed");
+        return;
+    }
+    if(dup2(fd_num,STDOUT_FD) == -1) {
+
+        if(close(fd_num) == -1) {
+            perror("smash: fork failed");
+            fd_num = -1;
+            return;
+        }
+        perror("smash: dup2 failed");
+        fd_num = -1;
+        return;
+    }
+}
+
+void RedirectionCommand::cleanup() {
+
+    if(close(fd_num) == -1) {
+        perror("smash: close failed");
+        return;
+    }
+    if(dup2(temp_stdout_fd, STDOUT_FD) == -1) {
+        perror("smash: dup2 failed");
+    }
 }
 
 CatCommand::CatCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
