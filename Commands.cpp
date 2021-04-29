@@ -778,6 +778,7 @@ void PipeCommand::execute() {
     }
     else if (p1 == 0){
         //  son 1 code
+        setpgrp();
         if(op == PIPE) {
             if(dup2(fd[PIPE_WRITE],STDOUT_FD) == -1) {
                 perror("smash: dup2 failed");
@@ -806,6 +807,7 @@ void PipeCommand::execute() {
         }
         else if (p2 == 0) {
             //  son 2 code
+            setpgrp();
             if( dup2(fd[PIPE_READ],STDIN_FD) == -1) {
                 perror("smash: dup2 failed");
                 return;

@@ -25,7 +25,7 @@
 #define STDOUT_FD 1
 #define STDIN_FD 0
 #define PIPE_READ 0
-#define PIPE_WRITE 0
+#define PIPE_WRITE 1
 
 enum SpecialCommand {
     NORMAL = 0,
