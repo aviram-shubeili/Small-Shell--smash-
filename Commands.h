@@ -68,7 +68,7 @@ public:
     void execute() override;
 };
 
-class PipeCommand : public Command {
+class PipeCommand : public BuiltInCommand { // TODO is this supposed to inherit builtin?
     // TODO: Add your data members
 public:
     PipeCommand(const char* cmd_line);
@@ -76,7 +76,7 @@ public:
     void execute() override;
 };
 
-class RedirectionCommand : public Command {
+class RedirectionCommand : public BuiltInCommand { // TODO is this supposed to inherit builtin?
     // TODO: Add your data members
 public:
     explicit RedirectionCommand(const char* cmd_line);
@@ -90,7 +90,7 @@ public:
 class ChangePromptCommand : public BuiltInCommand {
     std::string* smash_prompt;
 public:
-    ChangePromptCommand(const char *cmd_line, std::string *smash_prompt); // TODO more arguments maybe
+    ChangePromptCommand(const char *cmd_line, std::string *smash_prompt);
     virtual ~ChangePromptCommand() {}
     void execute() override;
 };

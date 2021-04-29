@@ -106,6 +106,21 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
+    for (int i=0; i<cmd_s.length(); i++){ // TODO better parsing? maybe splice with <, <<, |&, |?
+        if (cmd_s[i] == '|'){
+            if ((i+1 < cmd_s.length()) and (cmd_s[i+1] == '&')){ // TODO consider if we want to split between the ops here or later
+                return std::shared_ptr<Command>(new PipeCommand(cmd_line));
+            }
+            else { return std::shared_ptr<Command>(new PipeCommand(cmd_line)); } // op = '|'
+        }
+        else if (cmd_s[i] == '>'){
+            if ((i+1 < cmd_s.length()) and (cmd_s[i+1] == '>')){
+                return std::shared_ptr<Command>(new RedirectionCommand(cmd_line));
+            }
+            else { return std::shared_ptr<Command>(new RedirectionCommand(cmd_line)); }
+        }
+    }
+
     if (firstWord.compare("pwd") == 0){
         return std::shared_ptr<Command>(new GetCurrDirCommand(cmd_s.c_str()));
     }
@@ -136,6 +151,7 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWord.compare("cat")==0){
         return std::shared_ptr<Command>(new CatCommand(cmd_s.c_str()));
     }
+    //else if (firstWord.compare(""))
     else {
         return std::shared_ptr<Command>(new ExternalCommand(cmd_s.c_str()));
     }
@@ -666,6 +682,66 @@ void QuitCommand::execute() {
     if(num_arg >= 2 and strcmp(arguments[1],"kill") == 0) {
         jobs->killAllJobs();
     }
+}
+
+PipeCommand::PipeCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
+
+void PipeCommand::execute() {
+    SmallShell& smash = SmallShell::getInstance();
+    int fd [2];
+    if (pipe(fd) == -1){
+        //TODO Failure
+    }
+
+    pid_t p = fork();
+    if (p == -1) {
+        // fork failed
+        perror("smash: fork failed");
+    }
+    else if (p == 0){
+        close(fd[0]);
+
+    }
+    else {
+        //father code
+    }
+}
+
+RedirectionCommand::RedirectionCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
+
+void RedirectionCommand::execute() {
+    SmallShell &smash = SmallShell::getInstance();
+    string op = this->arguments[1]; // ">" or ">>". TODO: can this be someplace other than arguments[1]? if so, loop?
+
+    int fd_num;
+
+
+    pid_t p = fork(); //TODO Piazza said don't fork. tut3 page43 does fork though (and uses execv). what to do? I think it's possible without forking, but how?
+    if (p == -1) {
+        // fork failed
+        perror("smash: fork failed");
+    }
+    else if (p == 0){
+        close(1);
+        if (op == ">") {
+            fd_num = open(this->arguments[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        }
+        if (op == ">>") {
+            fd_num = open(this->arguments[2], O_APPEND | O_WRONLY | O_CREAT, 0666);
+        }
+        char* arguments[] = {this->arguments[0], NULL};
+        execv(arguments[0], arguments);
+        //write(fd_num, buffer, size); TODO how?
+    }
+    else{ // father code
+        close(0);
+        wait(NULL);
+    }
+
+    //TODO this is not writing to the file properly. I assume we need to use write(...), but how to do this while executing the command?
+    //std::shared_ptr<Command> cmd = smash.CreateCommand(this->arguments[0]);
+    //cmd->execute();
+    //cout << getpid() << endl;
 }
 
 CatCommand::CatCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
