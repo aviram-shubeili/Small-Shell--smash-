@@ -858,6 +858,10 @@ void RedirectionCommand::cleanup() {
     if(dup2(temp_stdout_fd, STDOUT_FD) == -1) {
         perror("smash: dup2 failed");
     }
+    if(close(temp_stdout_fd) == -1) {
+        perror("smash: close failed");
+        return;
+    }
 }
 
 CatCommand::CatCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {}
