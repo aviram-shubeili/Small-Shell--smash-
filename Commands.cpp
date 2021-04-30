@@ -127,16 +127,11 @@ bool isNumber(const std::string& s)
                         s.end(), [](unsigned char c) { return !std::isdigit(c); }) == s.end();
 }
 
-// TODO: Add your implementation for classes in Commands.h 
 
-SmallShell::SmallShell() : prompt_line("smash"), external_quit_flag(false)
-{
-// TODO: add your implementation
-}
 
-SmallShell::~SmallShell() {
-// TODO: add your implementation
-}
+SmallShell::SmallShell() : prompt_line("smash"), external_quit_flag(false), smash_pid(getpid()){}
+
+SmallShell::~SmallShell() {}
 
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_s)
@@ -146,20 +141,6 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
     string cmd_s = _trim(string(cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 
-//    for (int i=0; i<cmd_s.length(); i++){ // TODO better parsing? maybe splice with <, <<, |&, |?
-//        if (cmd_s[i] == '|'){
-//            if ((i+1 < cmd_s.length()) and (cmd_s[i+1] == '&')){ // TODO consider if we want to split between the ops here or later
-//                return std::shared_ptr<Command>(new PipeCommand(cmd_s, PIPE_TO_ERR));
-//            }
-//            else { return std::shared_ptr<Command>(new PipeCommand(cmd_s, PIPE_TO_ERR)); } // op = '|'
-//        }
-//        else if (cmd_s[i] == '>'){
-//            if ((i+1 < cmd_s.length()) and (cmd_s[i+1] == '>')){
-//                return std::shared_ptr<Command>(new RedirectionCommand(cmd_s, PIPE_TO_ERR));
-//            }
-//            else { return std::shared_ptr<Command>(new RedirectionCommand(cmd_s, PIPE_TO_ERR)); }
-//        }
-//    }
     string special_cmd;
     switch (_identifyAndSeperateSpecialSigns(cmd_s.c_str(),special_cmd)) {
         case PIPE:
@@ -179,35 +160,35 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
             break;
     }
 
-    if (firstWord.compare("pwd") == 0){
+    if (firstWord.compare("pwd") == 0 or firstWord.compare(("pwd&")) == 0){
         return std::shared_ptr<Command>(new GetCurrDirCommand(cmd_s.c_str()));
     }
-    else if (firstWord.compare("showpid") == 0){
+    else if (firstWord.compare("showpid") == 0 or firstWord.compare(("showpid&")) == 0){
         return std::shared_ptr<Command>(new ShowPidCommand(cmd_s.c_str()));
     }
-    else if (firstWord.compare("chprompt")==0){
+    else if (firstWord.compare("chprompt")==0 or firstWord.compare(("chprompt&")) == 0){
         return std::shared_ptr<Command>(new ChangePromptCommand(cmd_s.c_str(), &prompt_line));
     }
-    else if (firstWord.compare("cd")==0){
+    else if (firstWord.compare("cd")==0 or firstWord.compare(("cd&")) == 0){
         return std::shared_ptr<Command>(new ChangeDirCommand(cmd_s.c_str(), &last_working_directory));
     }
-    else if (firstWord.compare("jobs")==0){
+    else if (firstWord.compare("jobs")==0 or firstWord.compare(("jobs&")) == 0){
         return std::shared_ptr<Command>(new JobsCommand(cmd_s.c_str(),&jobs));
     }
-    else if (firstWord.compare("kill")==0){
+    else if (firstWord.compare("kill")==0 or firstWord.compare(("kill&")) == 0){
         return std::shared_ptr<Command>(new KillCommand(cmd_s.c_str(), &jobs));
     }
-    else if (firstWord.compare("fg")==0){
+    else if (firstWord.compare("fg")==0 or firstWord.compare(("fg&")) == 0){
         return std::shared_ptr<Command>(new ForegroundCommand(cmd_s.c_str(), &jobs));
     }
-    else if (firstWord.compare("bg")==0){
+    else if (firstWord.compare("bg")==0 or firstWord.compare(("bg&")) == 0){
         return std::shared_ptr<Command>( new BackgroundCommand(cmd_s.c_str(), &jobs));
     }
-    else if (firstWord.compare("quit")==0){
+    else if (firstWord.compare("quit")==0 or firstWord.compare(("quit&")) == 0){
         external_quit_flag = true;
         return std::shared_ptr<Command>(new QuitCommand(cmd_s.c_str(), &jobs));
     }
-    else if (firstWord.compare("cat")==0){
+    else if (firstWord.compare("cat")==0 or firstWord.compare(("cat&")) == 0){
         return std::shared_ptr<Command>(new CatCommand(cmd_s.c_str()));
     }
     else {
@@ -239,7 +220,6 @@ SmashOperation SmallShell::executeCommand(const char *cmd_line) {
             if(not (dynamic_cast<ExternalCommand*>(cmd.get())->is_bg_cmd)) {
                 // if its a foreground command:
                 jobs.setForeGroundJob(cmd);
-//                running_cmd = p; // TODO  maybe do this as well??
                 waitpid(jobs.getForeGroundJob()->getJobPid(),nullptr, WUNTRACED);
             }
             else {
@@ -248,7 +228,6 @@ SmashOperation SmallShell::executeCommand(const char *cmd_line) {
         }
     }
     else {
-        //if (cmd_s[0]=="") { // TODO handle forking external commands
         cmd->execute();
     }
 
@@ -297,17 +276,13 @@ ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line),
     if(is_bg_cmd) {
         _removeBackgroundSign(bash_cmd);
     }
-    //TODO: this init will be overridden as soon as the wrapper function will fork!!
-    //   cmd_pid = 0;
-
-
 }
 
 
 
 void ShowPidCommand::execute() {
-    pid_t pid = getpid();
-    cout << "smash job_pid is "<< pid << "\n";
+    SmallShell& smash = SmallShell::getInstance();
+    cout << "smash pid is "<< smash.smash_pid << "\n";
 }
 
 void GetCurrDirCommand::execute() {
@@ -480,8 +455,6 @@ void JobsList::removeJobById(int jobId){
     }
 }
 
-//shared_ptr<JobEntry> JobsList::getLastJobId(int* lastJobId){} // TODO last job that was done? or something else?
-
 shared_ptr<JobsList::JobEntry> JobsList::getLastStoppedJob(int *jobId) {
     removeFinishedJobs();
     for (int i = MAX_JOBS - 1; i > 0; --i) {
@@ -574,8 +547,9 @@ void JobsList::moveBGToFG(int job_id) {
     jobs[job_id] = nullptr;
     std::cout << *(fg_job->getCommand()) << " : ";
     std::cout << fg_job->getJobPid() << " " << endl;
-    // TODO does sending SIGCONT to a finished process could fail?
-    kill(fg_job->getJobPid(), SIGCONT);
+    if(kill(fg_job->getJobPid(), SIGCONT) == -1) {
+        perror("smash error: kill failed");
+    }
     // wait for the process to finish (or to be stopped by ctrl + z)
     waitpid(fg_job->getJobPid(), nullptr, WUNTRACED);
 }
@@ -591,9 +565,10 @@ void JobsList::ContinueJob(int job_id) {
     }
     std::cout << *(jobs[job_id]->getCommand()) << " : ";
     std::cout << jobs[job_id]->getJobPid() << " " << endl;
-    // TODO does sending SIGCONT to a finished process could fail?
     MarkCont(job_id);
-    kill(jobs[job_id]->getJobPid(), SIGCONT);
+    if(kill(jobs[job_id]->getJobPid(), SIGCONT) == -1) {
+        perror("smash error: kill failed");
+    }
     // dont wait.
 }
 
