@@ -282,7 +282,7 @@ ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line),
 
 void ShowPidCommand::execute() {
     SmallShell& smash = SmallShell::getInstance();
-    cout << "smash pid is "<< smash.smash_pid << "\n";
+    cout << "smash pid is "<< smash.smash_pid << endl;
 }
 
 void GetCurrDirCommand::execute() {
@@ -299,7 +299,7 @@ void ChangeDirCommand::execute() {
     }
     // too many args
     if (num_arg != 2) {
-        cerr << "smash error: cd: too many arguments\n";
+        cerr << "smash error: cd: too many arguments" << endl ;
         return;
     }
         // 2 args :]
@@ -308,7 +308,7 @@ void ChangeDirCommand::execute() {
         if(strcmp(arguments[1], "-") == 0) {
             // no where to go back
             if(oldpwd->empty()) {
-                cerr << "smash error: cd: OLDPWD not set\n";
+                cerr << "smash error: cd: OLDPWD not set" << endl;
                 return;
             }
             else {

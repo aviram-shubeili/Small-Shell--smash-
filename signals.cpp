@@ -15,7 +15,7 @@ void ctrlZHandler(int sig_num) {
             perror("smash error: kill failed");
         }
 
-        cout << "smash: process " << smash.getRunningCmd() << " was stopped\n";
+        cout << "smash: process " << smash.getRunningCmd() << " was stopped" << endl;
         smash.jobs.StopFG();
     }
     smash.jobs.setForeGroundJob(nullptr);
@@ -29,7 +29,7 @@ void ctrlCHandler(int sig_num) {
         if (kill(smash.getRunningCmd(),SIGKILL) == -1) {
             perror("smash error: kill failed");
         }
-        cout << "smash: process " << smash.getRunningCmd() << " was killed\n";
+        cout << "smash: process " << smash.getRunningCmd() << " was killed" << endl;
     }
     smash.jobs.setForeGroundJob(nullptr);
 }
