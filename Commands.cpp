@@ -122,9 +122,12 @@ void _removeBackgroundSign(string& cmd_line) {
 
 bool isNumber(const std::string& s)
 {
-    return !s.empty() &&
-           std::find_if(s.begin(),
-                        s.end(), [](unsigned char c) { return !std::isdigit(c); }) == s.end();
+    if(s.empty() || ((!isdigit(s[0])) && (s[0] != '-') && (s[0] != '+'))) return false;
+
+    char * p;
+    strtol(s.c_str(), &p, 10);
+
+    return (*p == 0);
 }
 
 
@@ -161,38 +164,38 @@ std::shared_ptr<Command> SmallShell::CreateCommand(const char* cmd_line) {
     }
 
     if (firstWord.compare("pwd") == 0 or firstWord.compare(("pwd&")) == 0){
-        return std::shared_ptr<Command>(new GetCurrDirCommand(cmd_s.c_str()));
+        return std::shared_ptr<Command>(new GetCurrDirCommand(cmd_line));
     }
     else if (firstWord.compare("showpid") == 0 or firstWord.compare(("showpid&")) == 0){
-        return std::shared_ptr<Command>(new ShowPidCommand(cmd_s.c_str()));
+        return std::shared_ptr<Command>(new ShowPidCommand(cmd_line));
     }
     else if (firstWord.compare("chprompt")==0 or firstWord.compare(("chprompt&")) == 0){
-        return std::shared_ptr<Command>(new ChangePromptCommand(cmd_s.c_str(), &prompt_line));
+        return std::shared_ptr<Command>(new ChangePromptCommand(cmd_line, &prompt_line));
     }
     else if (firstWord.compare("cd")==0 or firstWord.compare(("cd&")) == 0){
-        return std::shared_ptr<Command>(new ChangeDirCommand(cmd_s.c_str(), &last_working_directory));
+        return std::shared_ptr<Command>(new ChangeDirCommand(cmd_line, &last_working_directory));
     }
     else if (firstWord.compare("jobs")==0 or firstWord.compare(("jobs&")) == 0){
-        return std::shared_ptr<Command>(new JobsCommand(cmd_s.c_str(),&jobs));
+        return std::shared_ptr<Command>(new JobsCommand(cmd_line,&jobs));
     }
     else if (firstWord.compare("kill")==0 or firstWord.compare(("kill&")) == 0){
-        return std::shared_ptr<Command>(new KillCommand(cmd_s.c_str(), &jobs));
+        return std::shared_ptr<Command>(new KillCommand(cmd_line, &jobs));
     }
     else if (firstWord.compare("fg")==0 or firstWord.compare(("fg&")) == 0){
-        return std::shared_ptr<Command>(new ForegroundCommand(cmd_s.c_str(), &jobs));
+        return std::shared_ptr<Command>(new ForegroundCommand(cmd_line, &jobs));
     }
     else if (firstWord.compare("bg")==0 or firstWord.compare(("bg&")) == 0){
-        return std::shared_ptr<Command>( new BackgroundCommand(cmd_s.c_str(), &jobs));
+        return std::shared_ptr<Command>( new BackgroundCommand(cmd_line, &jobs));
     }
     else if (firstWord.compare("quit")==0 or firstWord.compare(("quit&")) == 0){
         external_quit_flag = true;
-        return std::shared_ptr<Command>(new QuitCommand(cmd_s.c_str(), &jobs));
+        return std::shared_ptr<Command>(new QuitCommand(cmd_line, &jobs));
     }
     else if (firstWord.compare("cat")==0 or firstWord.compare(("cat&")) == 0){
-        return std::shared_ptr<Command>(new CatCommand(cmd_s.c_str()));
+        return std::shared_ptr<Command>(new CatCommand(cmd_line));
     }
     else {
-        return std::shared_ptr<Command>(new ExternalCommand(cmd_s.c_str()));
+        return std::shared_ptr<Command>(new ExternalCommand(cmd_line));
     }
 
 }
@@ -206,7 +209,7 @@ SmashOperation SmallShell::executeCommand(const char *cmd_line) {
         pid_t p = fork();
         if (p == -1) {
             // fork failed
-            perror("smash: fork failed");
+            perror("smash error: fork failed");
         }
         else if (p == 0){
             // child code
@@ -256,7 +259,7 @@ pid_t SmallShell::getRunningCmd() const {
 
 
 BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
-    string temp(cmd_line);
+    string temp(this->cmd_line);
     // ignore & sign
     _removeBackgroundSign(temp);
     num_arg = _parseCommandLine(temp.c_str(), arguments);
@@ -270,9 +273,9 @@ BuiltInCommand::~BuiltInCommand() {
 }
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line),
-                                                         bash_cmd(cmd_line)
+                                                         bash_cmd(this->cmd_line)
 {
-    is_bg_cmd = _isBackgroundCommand(cmd_line);
+    is_bg_cmd = _isBackgroundCommand(bash_cmd.c_str());
     if(is_bg_cmd) {
         _removeBackgroundSign(bash_cmd);
     }
@@ -363,9 +366,13 @@ pid_t Command::getCmdPid() const {
 }
 
 ostream &operator<<(ostream &os, const Command &command) {
-    os << command.cmd_line;
+    os << command.untrimmed_cmd_line;
     return os;
 }
+
+Command::Command(const char *cmd_line)  : cmd_line(_trim(cmd_line)),
+                                          untrimmed_cmd_line(cmd_line),
+                                          cmd_pid(0) {}
 
 
 //=========================================Jobs List===========================================//
@@ -610,14 +617,19 @@ void KillCommand::execute() {
         cerr << "smash error: kill: invalid arguments" << endl;
         return;
     }
+    // make sure we dont send signal to a zombie process:
+    jobs->removeFinishedJobs();
+
     if(not jobs->isExists(job_id)) {
         cerr << "smash error: kill: job-id " << job_id <<  " does not exist" << endl;
         return;
     }
     if(kill(jobs->getPIDByJobId(job_id),signal) == -1) {
         perror("smash error: kill failed");
+        return;
     }
 
+    cout << "signal number " << signal << " was sent to pid " << jobs->getPIDByJobId(job_id) << endl;
 }
 
 
@@ -718,7 +730,7 @@ void QuitCommand::execute() {
 }
 
 PipeCommand::PipeCommand(const char *cmd_line, SpecialCommand op) : op(op) {
-    string temp(cmd_line);
+    string temp(this->cmd_line);
     size_t op_pos;
     if(op == PIPE) {
         op_pos = temp.find("|");
@@ -741,14 +753,14 @@ void PipeCommand::execute() {
 
     int fd [2];
     if (pipe(fd) == -1){
-        perror("smash: pipe failed");
+        perror("smash error: pipe failed");
         return;
     }
 
     pid_t p1 = fork();
     if (p1 == -1) {
         // fork failed
-        perror("smash: fork failed");
+        perror("smash error: fork failed");
         return;
     }
     else if (p1 == 0){
@@ -756,14 +768,14 @@ void PipeCommand::execute() {
         setpgrp();
         if(op == PIPE) {
             if(dup2(fd[PIPE_WRITE],STDOUT_FD) == -1) {
-                perror("smash: dup2 failed");
+                perror("smash error: dup2 failed");
                 return;
             }
         }
         else {
             // op == PIPE_ERR
             if(dup2(fd[PIPE_WRITE],STDERR_FD) == -1) {
-                perror("smash: dup2 failed");
+                perror("smash error: dup2 failed");
                 return;
             }
         }
@@ -777,14 +789,14 @@ void PipeCommand::execute() {
         pid_t p2 = fork();
         if (p2 == -1) {
             // fork failed
-            perror("smash: fork failed");
+            perror("smash error: fork failed");
             return;
         }
         else if (p2 == 0) {
             //  son 2 code
             setpgrp();
             if( dup2(fd[PIPE_READ],STDIN_FD) == -1) {
-                perror("smash: dup2 failed");
+                perror("smash error: dup2 failed");
                 return;
             }
             DO_CLOSE(close(fd[PIPE_READ]));
@@ -803,7 +815,7 @@ void PipeCommand::execute() {
 
 
 RedirectionCommand::RedirectionCommand(const char *cmd_line, SpecialCommand op) : op(op) {
-    string temp(cmd_line);
+    string temp(this->cmd_line);
     size_t op_pos;
     if(op == REDIRECTION_APPEND) {
         op_pos = temp.find(">>");
@@ -837,24 +849,24 @@ void RedirectionCommand::prepare()  {
 
     temp_stdout_fd = dup(STDOUT_FD);
     if(temp_stdout_fd == -1) {
-        perror("smash: dup failed");
+        perror("smash error: dup failed");
         return;
     }
     fd_num = (op == REDIRECTION_APPEND) ?
              open(file_path.c_str(),  O_APPEND | O_WRONLY | O_CREAT, 0666) :
              open(file_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if(fd_num == -1) {
-        perror("smash: open failed");
+        perror("smash error: open failed");
         return;
     }
     if(dup2(fd_num,STDOUT_FD) == -1) {
 
         if(close(fd_num) == -1) {
-            perror("smash: close failed");
+            perror("smash error: close failed");
             fd_num = -1;
             return;
         }
-        perror("smash: dup2 failed");
+        perror("smash error: dup2 failed");
         fd_num = -1;
         return;
     }
@@ -863,14 +875,14 @@ void RedirectionCommand::prepare()  {
 void RedirectionCommand::cleanup() {
 
     if(close(fd_num) == -1) {
-        perror("smash: close failed");
+        perror("smash error: close failed");
         return;
     }
     if(dup2(temp_stdout_fd, STDOUT_FD) == -1) {
-        perror("smash: dup2 failed");
+        perror("smash error: dup2 failed");
     }
     if(close(temp_stdout_fd) == -1) {
-        perror("smash: close failed");
+        perror("smash error: close failed");
         return;
     }
 }

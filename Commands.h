@@ -42,21 +42,21 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 int _parseCommandLine(const char* cmd_line, char** args);
 
 class Command {
-    std::string cmd_line;
-public:
-    friend std::ostream &operator<<(std::ostream &os, const Command &command);
 
+protected:
+    std::string cmd_line;
 private:
+    std::string untrimmed_cmd_line;
     pid_t cmd_pid;
 public:
-    explicit Command(const char* cmd_line= "") : cmd_line(cmd_line),
-                                                 cmd_pid(0) {}
+    explicit Command(const char* cmd_line= "");
     virtual ~Command() {}
     virtual void execute() = 0;
     virtual void prepare() {}
     virtual void cleanup() {}
     void setCmdPid(pid_t cmdPid);
     pid_t getCmdPid() const;
+    friend std::ostream &operator<<(std::ostream &os, const Command &command);
 };
 
 class BuiltInCommand : public Command {
