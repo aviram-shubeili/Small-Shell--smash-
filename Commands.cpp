@@ -474,6 +474,7 @@ shared_ptr<JobsList::JobEntry> JobsList::getLastStoppedJob(int *jobId) {
 }
 
 int JobsList::getMinFreeID() {
+    removeFinishedJobs();
     for (int i = 1; i < MAX_JOBS; i++) {
         if (jobs[i] == nullptr) {
             return i;
