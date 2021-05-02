@@ -49,7 +49,7 @@ private:
     std::string untrimmed_cmd_line;
     pid_t cmd_pid;
 public:
-    explicit Command(const char* cmd_line= "");
+    explicit Command(const char* cmd_line);
     virtual ~Command() {}
     virtual void execute() = 0;
     virtual void prepare() {}

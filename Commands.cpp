@@ -659,7 +659,7 @@ void ForegroundCommand::execute() {
     }
     if(num_arg == 2) {
         if( not jobs->isExists(job_id)) {
-            cerr << "smash error: fg: " << job_id << " does not exist" << endl;
+            cerr << "smash error: fg: job-id" << job_id << " does not exist" << endl;
             return;
         }
     }
@@ -700,14 +700,14 @@ void BackgroundCommand::execute() {
     }
     if(num_arg == 2) {
         if( not jobs->isExists(job_id)) {
-            cerr << "smash error: bg: " << job_id << " does not exist" << endl;
+            cerr << "smash error: bg: job-id " << job_id << " does not exist" << endl;
             return;
         }
     }
     else if(num_arg == 1) {
         if(job_id == -1) {
             // getLastJobId return -1 --> jobs list is empty
-            cerr << "smash error: bg: jobs list is empty" << endl;
+            cerr << "smash error: bg: there is no stopped jobs to resume" << endl;
             return;
         }
     }
@@ -729,21 +729,32 @@ void QuitCommand::execute() {
     }
 }
 
-PipeCommand::PipeCommand(const char *cmd_line, SpecialCommand op) : op(op) {
+PipeCommand::PipeCommand(const char *cmd_line, SpecialCommand op) :Command(cmd_line),
+                                                                   op(op) {
     string temp(this->cmd_line);
     size_t op_pos;
     if(op == PIPE) {
         op_pos = temp.find("|");
-        // skip | and space
+        if(temp.find_last_not_of(WHITESPACE) == op_pos) {
+            // no file name given // TODO do something!!
+        }
+        else {
+            // skip | and space
+            cmd2_s = temp.substr(op_pos + 2);
+        }
         cmd1_s = temp.substr(0, op_pos);
-        cmd2_s = temp.substr(op_pos + 2);
     }
         // PIPE_TO_ERR
     else {
         op_pos = temp.find("|&");
-        // skip |& and space
+        if(temp.find_last_not_of(WHITESPACE) == op_pos + 1) {
+            // no file name given // TODO do something!!
+        }
+        else {
+            // skip |& and space
+            cmd2_s = temp.substr(op_pos + 3);
+        }
         cmd1_s = temp.substr(0, op_pos);
-        cmd2_s = temp.substr(op_pos + 3);
     }
 
 }
@@ -814,19 +825,30 @@ void PipeCommand::execute() {
 }
 
 
-RedirectionCommand::RedirectionCommand(const char *cmd_line, SpecialCommand op) : op(op) {
+RedirectionCommand::RedirectionCommand(const char *cmd_line, SpecialCommand op) : Command(cmd_line),
+                                                                                  op(op) {
     string temp(this->cmd_line);
     size_t op_pos;
     if(op == REDIRECTION_APPEND) {
         op_pos = temp.find(">>");
-        // skip >> and space
-        file_path = temp.substr(op_pos + 3);
+        if(temp.find_last_not_of(WHITESPACE) == op_pos + 1) {
+            // no file name given // TODO do something!!
+        }
+        else {
+            // skip >> and space
+            file_path = temp.substr(op_pos + 3);
+        }
     }
         // REDIRECTION
     else {
         op_pos = temp.find(">");
-        // skip > and space
-        file_path = temp.substr(op_pos + 2);
+        if(temp.find_last_not_of(WHITESPACE) == op_pos) {
+            // no file name given // TODO do something!!
+        }
+        else {
+            // skip > and space
+            file_path = temp.substr(op_pos + 2);
+        }
     }
     cmd_s = temp.substr(0,op_pos);
     file_path = _trim(file_path);
