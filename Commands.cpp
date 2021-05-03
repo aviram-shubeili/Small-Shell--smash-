@@ -474,7 +474,7 @@ void JobsList::killAllJobs(){
     }
 
     cout << "smash: sending SIGKILL signal to " << arr_len << " jobs:" << endl;
-    for (int i = 1; i<arr_len; i++) {
+    for (int i = 0; i<arr_len; i++) {
         cout << jobs[sorted_arr[i].original_id]->getJobPid() << ": " << *(jobs[sorted_arr[i].original_id]->getCommand()) << endl;
         if (kill(jobs[sorted_arr[i].original_id]->getJobPid(), SIGKILL) == -1) {
             perror("smash error: kill failed");
