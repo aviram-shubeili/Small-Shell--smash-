@@ -470,20 +470,19 @@ shared_ptr<JobsList::JobEntry> JobsList::getLastStoppedJob(int *jobId) {
             return jobs[i];
         }
     }
+    *jobId = -1;
     return nullptr;
 }
 
 int JobsList::getMinFreeID() {
     removeFinishedJobs();
-    for (int i = 1; i < MAX_JOBS; i++) {
-        if (jobs[i] == nullptr) {
-            return i;
+    int max_job_id = 1;
+    for (int i = 1 ; i < MAX_JOBS ; i++) {
+        if (jobs[i] != nullptr and i > max_job_id) {
+            max_job_id = i;
         }
     }
-    // NOTE: should never get here!
-    assert(false);
-    return MAX_JOBS;
-
+    return max_job_id + 1;
 }
 
 void JobsList::setForeGroundJob(std::shared_ptr<Command> fg_cmd) {
@@ -573,7 +572,7 @@ void JobsList::ContinueJob(int job_id) {
         return;
     }
     std::cout << *(jobs[job_id]->getCommand()) << " : ";
-    std::cout << jobs[job_id]->getJobPid() << " " << endl;
+    std::cout << jobs[job_id]->getJobPid() << endl;
     MarkCont(job_id);
     if(kill(jobs[job_id]->getJobPid(), SIGCONT) == -1) {
         perror("smash error: kill failed");
@@ -636,7 +635,9 @@ void KillCommand::execute() {
 
 
 ForegroundCommand::ForegroundCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),
-                                                                             jobs(jobs) { }
+                                                                             jobs(jobs) {
+    jobs->removeFinishedJobs();
+}
 
 bool ForegroundCommand::getArguments() {
     if( num_arg > 2) {
@@ -661,7 +662,7 @@ void ForegroundCommand::execute() {
     }
     if(num_arg == 2) {
         if( not jobs->isExists(job_id)) {
-            cerr << "smash error: fg: job-id" << job_id << " does not exist" << endl;
+            cerr << "smash error: fg: job-id " << job_id << " does not exist" << endl;
             return;
         }
     }
@@ -677,7 +678,9 @@ void ForegroundCommand::execute() {
 }
 
 BackgroundCommand::BackgroundCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line),
-                                                                             jobs(jobs) { }
+                                                                             jobs(jobs) {
+    jobs->removeFinishedJobs();
+}
 
 bool BackgroundCommand::getArguments() {
     if( num_arg > 2) {
@@ -713,8 +716,8 @@ void BackgroundCommand::execute() {
             return;
         }
     }
-    else if(not jobs->isStopped(job_id)) {
-        cerr << "smash error: bg: " << job_id << " is already running in the background" << endl;
+    if(not jobs->isStopped(job_id)) {
+        cerr << "smash error: bg: job-id " << job_id << " is already running in the background" << endl;
         return;
     }
 
