@@ -449,21 +449,38 @@ void JobsList::printJobsList() {
 
 void JobsList::killAllJobs(){
     removeFinishedJobs();
-    int jobs_count = 0;
-    for(int i = 1 ; i < MAX_JOBS ; i++) {
-        if(jobs[i]) {
-            jobs_count++;
+
+    struct sort_node {
+        int job_id;
+        int original_id;
+    };
+
+    sort_node sorted_arr[100];
+    int arr_len = 0;
+    for (int i = 1; i < MAX_JOBS; i++) {
+        if (jobs[i]) {
+            sorted_arr[arr_len].job_id = jobs[i]->getJobId();
+            sorted_arr[arr_len].original_id = i;
+            arr_len++;
         }
     }
-    cout << "smash: sending SIGKILL signal to " << jobs_count << " jobs:" << endl;
-    for (int i = 1; i<MAX_JOBS; i++){
-        if (jobs[i]){
-            cout << jobs[i]->getJobPid() << ": " << *(jobs[i]->getCommand()) << endl;
-            if(kill(jobs[i]->getJobPid(),SIGKILL) == -1) {
-                perror("smash error: kill failed");
+
+    for (int i = 0; i < arr_len; i++) {
+        for (int j = 0; j < (arr_len - 1 - i); j++) {
+            if (sorted_arr[j].job_id > sorted_arr[j + 1].job_id) {
+                swap(sorted_arr[j], sorted_arr[j + 1]);
             }
-            jobs[i] = nullptr;
         }
+    }
+
+    cout << "smash: sending SIGKILL signal to " << arr_len << " jobs:" << endl;
+    for (int i = 1; i<arr_len; i++) {
+        cout << jobs[sorted_arr[i].original_id]->getJobPid() << ": " << *(jobs[sorted_arr[i].original_id]->getCommand()) << endl;
+        if (kill(jobs[sorted_arr[i].original_id]->getJobPid(), SIGKILL) == -1) {
+            perror("smash error: kill failed");
+        }
+        jobs[sorted_arr[i].original_id] = nullptr;
+
     }
 }
 
