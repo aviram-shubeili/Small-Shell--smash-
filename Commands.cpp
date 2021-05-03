@@ -410,9 +410,9 @@ void JobsList::printJobsList(){
             std::cout << "[" << i << "] ";
             std::cout << *(jobs[i]->getCommand()) << " : ";
             std::cout << jobs[i]->getJobPid() << " ";
-            std::cout << difftime(time(nullptr), jobs[i]->getTime()) << " secs ";
+            std::cout << difftime(time(nullptr), jobs[i]->getTime()) << " secs";
             if (jobs[i]->isStopped()){
-                std::cout << "(stopped)";
+                std::cout << " (stopped)";
             }
             std::cout << std::endl;
         }
@@ -535,6 +535,7 @@ pid_t JobsList::getPIDByJobId(int jobId) {
 }
 
 int JobsList::getLastJobId(int *lastJobId) {
+    removeFinishedJobs();
     for(int i = MAX_JOBS-1 ; i > 0 ; i--) {
         if(jobs[i]) {
             *lastJobId = i;
@@ -554,7 +555,7 @@ void JobsList::moveBGToFG(int job_id) {
     fg_job = jobs[job_id];
     jobs[job_id] = nullptr;
     std::cout << *(fg_job->getCommand()) << " : ";
-    std::cout << fg_job->getJobPid() << " " << endl;
+    std::cout << fg_job->getJobPid() << endl;
     if(kill(fg_job->getJobPid(), SIGCONT) == -1) {
         perror("smash error: kill failed");
     }

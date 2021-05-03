@@ -2,7 +2,7 @@
 #include <signal.h>
 #include "signals.h"
 #include "Commands.h"
-
+#include <wait.h>
 using namespace std;
 
 void ctrlZHandler(int sig_num) {
@@ -10,11 +10,16 @@ void ctrlZHandler(int sig_num) {
     SmallShell& smash = SmallShell::getInstance();
     // checks if there is an external command running in the fg:
     if(smash.getRunningCmd() != NO_RUNNING_CMD) {
-
+        int status;
+        status = waitpid(smash.getRunningCmd(), nullptr, WNOHANG);
+        // if status == -1  <--> process died
+        if(status == -1 or status == smash.getRunningCmd()) {
+            return;
+        }
         if(kill(smash.getRunningCmd(),SIGSTOP) == -1) {
             perror("smash error: kill failed");
+            return;
         }
-
         cout << "smash: process " << smash.getRunningCmd() << " was stopped" << endl;
         smash.jobs.StopFG();
     }
@@ -26,8 +31,15 @@ void ctrlCHandler(int sig_num) {
     SmallShell& smash = SmallShell::getInstance();
     // checks if there is an external command running:
     if(smash.getRunningCmd() != NO_RUNNING_CMD) {
+        int status;
+        status = waitpid(smash.getRunningCmd(), nullptr, WNOHANG);
+        // if status == pid <--> process exited (finished)
+        if(status == -1 or status == smash.getRunningCmd()) {
+            return;
+        }
         if (kill(smash.getRunningCmd(),SIGKILL) == -1) {
             perror("smash error: kill failed");
+            return;
         }
         cout << "smash: process " << smash.getRunningCmd() << " was killed" << endl;
     }
