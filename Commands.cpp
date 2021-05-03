@@ -379,10 +379,11 @@ Command::Command(const char *cmd_line)  : cmd_line(_trim(cmd_line)),
 //==============Job Entry==========//
 
 JobsList::JobEntry::JobEntry
-        (std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped, int id) : cmd(cmd),
+        (std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped, int job_id, int cell_id) : cmd(cmd),
                                                                             is_stopped(is_stopped),
                                                                             job_pid(p),
-                                                                            job_id(id)
+                                                                            job_id(job_id),
+                                                                            cell_id(cell_id)
 {
     // update  executed time
     time(&time_executed);
@@ -399,23 +400,46 @@ void JobsList::JobEntry::resetTime() {
 JobsList::JobsList() : jobs(MAX_JOBS) {}
 
 void JobsList::addJob(std::shared_ptr<Command> cmd, bool isStopped){
-    int job_id = getMinFreeID();
-    jobs[job_id] = std::make_shared<JobEntry>(cmd, cmd->getCmdPid(),false, job_id);
+    int job_id = getArrFreeID(); //find the empty slot in the array
+    max_job_id++;
+    jobs[job_id] = std::make_shared<JobEntry>(cmd, cmd->getCmdPid(),false, max_job_id);
 }
 
-void JobsList::printJobsList(){
+void JobsList::printJobsList() {
     removeFinishedJobs();
-    for (int i = 1; i < MAX_JOBS; i++){
+
+    struct sort_node {
+        int job_id;
+        int original_id;
+    };
+
+    sort_node sorted_arr[100];
+    int arr_len = 0;
+    for (int i = 1; i < MAX_JOBS; i++) {
         if (jobs[i]) {
-            std::cout << "[" << i << "] ";
-            std::cout << *(jobs[i]->getCommand()) << " : ";
-            std::cout << jobs[i]->getJobPid() << " ";
-            std::cout << difftime(time(nullptr), jobs[i]->getTime()) << " secs";
-            if (jobs[i]->isStopped()){
-                std::cout << " (stopped)";
-            }
-            std::cout << std::endl;
+            sorted_arr[arr_len].job_id = jobs[i]->getJobId();
+            sorted_arr[arr_len].original_id = i;
+            arr_len++;
         }
+    }
+
+    for (int i = 0; i < arr_len; i++) {
+        for (int j = 0; j < (arr_len - 1 - i); j++) {
+            if (sorted_arr[j].job_id > sorted_arr[j + 1].job_id) {
+                swap(sorted_arr[j], sorted_arr[j + 1]);
+            }
+        }
+    }
+
+    for (int i = 0; i < arr_len; i++) {
+        std::cout << "[" << jobs[sorted_arr[i].original_id]->getJobId() << "] ";
+        std::cout << *(jobs[sorted_arr[i].original_id]->getCommand()) << " : ";
+        std::cout << jobs[sorted_arr[i].original_id]->getJobPid() << " ";
+        std::cout << difftime(time(nullptr), jobs[sorted_arr[i].original_id]->getTime()) << " secs";
+        if (jobs[sorted_arr[i].original_id]->isStopped()) {
+            std::cout << " (stopped)";
+        }
+        std::cout << std::endl;
     }
 }
 
@@ -450,15 +474,24 @@ void JobsList::removeFinishedJobs(){
             }
         }
     }
+    updateMaxJobId();
 }
 shared_ptr<JobsList::JobEntry> JobsList::getJobById(int jobId){
-    return jobs[jobId];
+    for (int i=1; i<MAX_JOBS; i++){
+        if (jobs[i] and jobs[i]->getJobId() == jobId){
+            return jobs[i];
+        }
+    }
 }
 //  Warning! this doesnt kill process! only removes from list.
 // user should have a pointer to job (via getJobById) before removing from list.
 void JobsList::removeJobById(int jobId){
     if( 0 < jobId and jobId < MAX_JOBS) {
-        jobs[jobId] = nullptr;
+        for (int i=1; i<MAX_JOBS; i++){
+            if (jobs[i] and jobs[i]->getJobId() == jobId) {
+                jobs[jobId] = nullptr;
+            }
+        }
     }
 }
 
@@ -466,7 +499,7 @@ shared_ptr<JobsList::JobEntry> JobsList::getLastStoppedJob(int *jobId) {
     removeFinishedJobs();
     for (int i = MAX_JOBS - 1; i > 0; --i) {
         if (jobs[i] and jobs[i]->isStopped()) {
-            *jobId = i;
+            *jobId = jobs[i]->getJobId();
             return jobs[i];
         }
     }
@@ -474,15 +507,26 @@ shared_ptr<JobsList::JobEntry> JobsList::getLastStoppedJob(int *jobId) {
     return nullptr;
 }
 
-int JobsList::getMinFreeID() {
+//returns the position in the array job should be assigned to
+int JobsList::getArrFreeID() {
     removeFinishedJobs();
-    int max_job_id = 1;
     for (int i = 1 ; i < MAX_JOBS ; i++) {
-        if (jobs[i] != nullptr and i > max_job_id) {
-            max_job_id = i;
+        if (jobs[i] == nullptr) {
+            return i;
         }
     }
-    return max_job_id + 1;
+    return -1; //in case the array is full, return -1
+}
+
+
+void JobsList::updateMaxJobId(){
+    int curr_max_id = 0;
+    for (int i=1; i<MAX_JOBS; i++){
+        if (jobs[i] and jobs[i]->getJobId() > curr_max_id){
+            curr_max_id = jobs[i]->getJobId();
+        }
+    }
+    this->max_job_id = curr_max_id;
 }
 
 void JobsList::setForeGroundJob(std::shared_ptr<Command> fg_cmd) {
@@ -500,14 +544,22 @@ const shared_ptr<JobsList::JobEntry> &JobsList::getForeGroundJob() const {
 
 void JobsList::MarkStopped(int job_id) {
     if( 0 < job_id and job_id < MAX_JOBS and jobs[job_id]) {
-        jobs[job_id]->setIsStopped(true);
+        for (int i=0; i<MAX_JOBS; i++) {
+            if (jobs[i] and jobs[i]->getJobId() == job_id) {
+                jobs[i]->setIsStopped(true);
+            }
+        }
     }
 }
 
 
 void JobsList::MarkCont(int job_id) {
     if( 0 < job_id and job_id < MAX_JOBS and jobs[job_id]) {
-        jobs[job_id]->setIsStopped(false);
+        for (int i=0; i<MAX_JOBS; i++) {
+            if (jobs[i] and jobs[i]->getJobId() == job_id) {
+                jobs[i]->setIsStopped(false);
+            }
+        }
     }
 }
 
@@ -515,15 +567,20 @@ void JobsList::StopFG() {
     if(fg_job) {
         fg_job->setIsStopped(true);
         fg_job->resetTime();
-        jobs[getMinFreeID()] = fg_job;
+        jobs[getArrFreeID()] = fg_job;
         fg_job = nullptr;
     }
 }
 
-bool JobsList::isExists(int job_id) {
-    return 0 < job_id and
-           job_id < MAX_JOBS and
-           jobs[job_id] != nullptr;
+int JobsList::isExists(int job_id) {
+    if (0 < job_id and job_id < MAX_JOBS) {
+        for (int i = 0; i < MAX_JOBS; i++) {
+            if (jobs[i] and jobs[i]->getJobId() == job_id) {
+                return i;
+            }
+        }
+    }
+    return 0;
 }
 
 pid_t JobsList::getPIDByJobId(int jobId) {
@@ -535,6 +592,15 @@ pid_t JobsList::getPIDByJobId(int jobId) {
 
 int JobsList::getLastJobId(int *lastJobId) {
     removeFinishedJobs();
+    if (max_job_id == 0) {
+        *lastJobId = -1;
+        return -1;
+    } else {
+        *lastJobId = max_job_id;
+        return max_job_id;
+    }
+}
+/*
     for(int i = MAX_JOBS-1 ; i > 0 ; i--) {
         if(jobs[i]) {
             *lastJobId = i;
@@ -544,15 +610,16 @@ int JobsList::getLastJobId(int *lastJobId) {
     // if list is empty - return -1 to indicate.
     *lastJobId = -1;
     return -1;
-}
+}*/
 
 void JobsList::moveBGToFG(int job_id) {
     if (not isExists(job_id)) {
         return;
     }
     // update FGJob and remove from list
-    fg_job = jobs[job_id];
-    jobs[job_id] = nullptr;
+    shared_ptr<JobEntry> job = this->getJobById(job_id);
+    fg_job = job;
+    jobs[job->getCell()] = nullptr;
     std::cout << *(fg_job->getCommand()) << " : ";
     std::cout << fg_job->getJobPid() << endl;
     if(kill(fg_job->getJobPid(), SIGCONT) == -1) {
@@ -563,8 +630,9 @@ void JobsList::moveBGToFG(int job_id) {
 }
 
 bool JobsList::isStopped(int job_id) {
-    return isExists(job_id) and
-           jobs[job_id]->isStopped();
+    int exists = isExists(job_id);
+    return exists and
+           jobs[exists]->isStopped();
 }
 
 void JobsList::ContinueJob(int job_id) {

@@ -164,21 +164,26 @@ class JobsList {
         bool is_stopped;
         pid_t job_pid;
         int job_id;
+        int cell_id;
     public:
-        JobEntry(std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped = false, int id= 0);
+        JobEntry(std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped = false, int job_id= 0, int cell_id=0);
         ~JobEntry() = default;
         std::shared_ptr<Command> getCommand() { return cmd; }
         time_t getTime() const { return time_executed; }
         void resetTime();
         bool isStopped() const { return is_stopped; }
         pid_t getJobPid() const { return  job_pid; }
+        int getJobId() const { return job_id; }
+        int getCell() const { return cell_id; }
         void setIsStopped(bool isStopped);
     };
 
 private:
+    int max_job_id;
     std::vector<std::shared_ptr<JobEntry>> jobs;
     std::shared_ptr<JobEntry> fg_job;
-    int getMinFreeID();
+    int getArrFreeID();
+    void updateMaxJobId();
 //    std::vector<int> to_clear;
 public:
     JobsList();
@@ -200,7 +205,7 @@ public:
     void MarkStopped(int job_id);
     void ContinueJob(int job_id);
     void MarkCont(int job_id);
-    bool isExists(int job_id);
+    int isExists(int job_id);
     bool isStopped(int job_id);
     friend class SmallShell;
 
