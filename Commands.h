@@ -174,6 +174,7 @@ class JobsList {
         bool isStopped() const { return is_stopped; }
         pid_t getJobPid() const { return  job_pid; }
         int getJobId() const { return job_id; }
+        void setJobId(int jobId);
         int getCell() const { return cell_id; }
         void setIsStopped(bool isStopped);
     };
@@ -197,7 +198,6 @@ public:
     void removeJobById(int jobId);
     int getLastJobId(int* lastJobId);
     std::shared_ptr<JobEntry> getLastStoppedJob(int *jobId);
-
     void setForeGroundJob(std::shared_ptr<Command> fg_cmd);
     const std::shared_ptr<JobEntry> &getForeGroundJob() const;
     void moveBGToFG(int job_id);

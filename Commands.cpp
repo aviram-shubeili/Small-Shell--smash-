@@ -380,10 +380,10 @@ Command::Command(const char *cmd_line)  : cmd_line(_trim(cmd_line)),
 
 JobsList::JobEntry::JobEntry
         (std::shared_ptr<Command> &cmd, pid_t p, bool is_stopped, int job_id, int cell_id) : cmd(cmd),
-                                                                            is_stopped(is_stopped),
-                                                                            job_pid(p),
-                                                                            job_id(job_id),
-                                                                            cell_id(cell_id)
+                                                                                             is_stopped(is_stopped),
+                                                                                             job_pid(p),
+                                                                                             job_id(job_id),
+                                                                                             cell_id(cell_id)
 {
     // update  executed time
     time(&time_executed);
@@ -394,6 +394,10 @@ void JobsList::JobEntry::setIsStopped(bool isStopped) {
 
 void JobsList::JobEntry::resetTime() {
     time(&time_executed);
+}
+
+void JobsList::JobEntry::setJobId(int jobId) {
+    job_id = jobId;
 }
 
 
@@ -482,6 +486,7 @@ shared_ptr<JobsList::JobEntry> JobsList::getJobById(int jobId){
             return jobs[i];
         }
     }
+    return nullptr;
 }
 //  Warning! this doesnt kill process! only removes from list.
 // user should have a pointer to job (via getJobById) before removing from list.
@@ -497,14 +502,19 @@ void JobsList::removeJobById(int jobId){
 
 shared_ptr<JobsList::JobEntry> JobsList::getLastStoppedJob(int *jobId) {
     removeFinishedJobs();
+    int max_stopped_job_id =  -1;
+    int max_stopped_arr_id =  0;
+
     for (int i = MAX_JOBS - 1; i > 0; --i) {
         if (jobs[i] and jobs[i]->isStopped()) {
-            *jobId = jobs[i]->getJobId();
-            return jobs[i];
+            if(max_stopped_job_id < jobs[i]->getJobId()) {
+                max_stopped_job_id = jobs[i]->getJobId();
+                max_stopped_arr_id = i;
+            }
         }
     }
-    *jobId = -1;
-    return nullptr;
+    *jobId = max_stopped_job_id;
+    return max_stopped_arr_id == 0 ? nullptr : jobs[max_stopped_arr_id];
 }
 
 //returns the position in the array job should be assigned to
@@ -543,32 +553,31 @@ const shared_ptr<JobsList::JobEntry> &JobsList::getForeGroundJob() const {
 }
 
 void JobsList::MarkStopped(int job_id) {
-    if( 0 < job_id and job_id < MAX_JOBS and jobs[job_id]) {
-        for (int i=0; i<MAX_JOBS; i++) {
-            if (jobs[i] and jobs[i]->getJobId() == job_id) {
-                jobs[i]->setIsStopped(true);
-            }
-        }
+    int cell_id = isExists(job_id);
+    if (cell_id != 0) {
+        jobs[cell_id]->setIsStopped(true);
     }
 }
 
 
 void JobsList::MarkCont(int job_id) {
-    if( 0 < job_id and job_id < MAX_JOBS and jobs[job_id]) {
-        for (int i=0; i<MAX_JOBS; i++) {
-            if (jobs[i] and jobs[i]->getJobId() == job_id) {
-                jobs[i]->setIsStopped(false);
-            }
-        }
+    int cell_id = isExists(job_id);
+    if (cell_id != 0) {
+        jobs[cell_id]->setIsStopped(false);
     }
 }
+
 
 void JobsList::StopFG() {
     if(fg_job) {
         fg_job->setIsStopped(true);
         fg_job->resetTime();
         jobs[getArrFreeID()] = fg_job;
+        if(fg_job->getJobId() == 0) {
+            fg_job->setJobId(++max_job_id);
+        }
         fg_job = nullptr;
+
     }
 }
 
@@ -587,7 +596,7 @@ pid_t JobsList::getPIDByJobId(int jobId) {
     if(not isExists(jobId)) {
         return 0;
     }
-    return jobs[jobId]->getJobPid();
+    return jobs[isExists(jobId)]->getJobPid();
 }
 
 int JobsList::getLastJobId(int *lastJobId) {
@@ -619,7 +628,7 @@ void JobsList::moveBGToFG(int job_id) {
     // update FGJob and remove from list
     shared_ptr<JobEntry> job = this->getJobById(job_id);
     fg_job = job;
-    jobs[job->getCell()] = nullptr;
+    jobs[isExists(job_id)] = nullptr;
     std::cout << *(fg_job->getCommand()) << " : ";
     std::cout << fg_job->getJobPid() << endl;
     if(kill(fg_job->getJobPid(), SIGCONT) == -1) {
@@ -639,10 +648,10 @@ void JobsList::ContinueJob(int job_id) {
     if(not isStopped(job_id)) {
         return;
     }
-    std::cout << *(jobs[job_id]->getCommand()) << " : ";
-    std::cout << jobs[job_id]->getJobPid() << endl;
+    std::cout << *(jobs[isExists(job_id)]->getCommand()) << " : ";
+    std::cout << jobs[isExists(job_id)]->getJobPid() << endl;
     MarkCont(job_id);
-    if(kill(jobs[job_id]->getJobPid(), SIGCONT) == -1) {
+    if(kill(jobs[isExists(job_id)]->getJobPid(), SIGCONT) == -1) {
         perror("smash error: kill failed");
     }
     // dont wait.
